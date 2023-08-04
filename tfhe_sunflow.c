@@ -6,6 +6,126 @@
 #include "ni.c"
 #include "sdram.h"
 */
+typedef int32_t Torus32; //avant uint32_t
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+struct TorusPolynomial {
+    int32_t N;
+   Torus32* coefsT;
+
+#ifdef __cplusplus   
+   TorusPolynomial(const int32_t N);
+   ~TorusPolynomial();
+   TorusPolynomial(const TorusPolynomial&) = delete; //forbidden 
+   TorusPolynomial* operator=(const TorusPolynomial&) = delete; //forbidden
+#endif
+};
+
+// TorusPolynomial的初始化函数
+void TorusPolynomial_init(TorusPolynomial* poly,  int32_t N) {
+    poly->N = N;
+    poly->coefsT = (Torus32*)malloc(N * sizeof(Torus32));
+}
+
+// TorusPolynomial的清理函数（类似于析构函数）
+void TorusPolynomial_destroy(struct TorusPolynomial* poly) {
+    free(poly->coefsT);
+}
+
+
+
+
+struct LweParams {
+	const int32_t n;
+	const double alpha_min;//le plus petit bruit tq sur
+	const double alpha_max;//le plus gd bruit qui permet le déchiffrement
+//since all members are declared constant, a constructor is 
+//required in the structure.
+#ifdef __cplusplus
+	LweParams(int32_t n, double alpha_min, double alpha_max);
+	~LweParams();
+	LweParams(const LweParams&) = delete; //forbidden
+	LweParams& operator=(const LweParams& ) = delete; //forbidden
+#endif
+};
+
+struct LweSample {
+	Torus32* a; //-- the n coefs of the mask
+    Torus32 b;  //
+   	double current_variance; //-- average noise of the sample
+
+#ifdef __cplusplus
+   LweSample(const LweParams* params);
+   ~LweSample();
+   LweSample(const LweSample&)=delete;
+   LweSample& operator=(const LweSample&)=delete;
+#endif
+};
+
+struct TLweParams {
+    const int32_t N; ///< a power of 2: degree of the polynomials
+    const int32_t k; ///< number of polynomials in the mask
+    const double alpha_min; ///< minimal noise s.t. the sample is secure
+    const double alpha_max; ///< maximal noise s.t. we can decrypt
+    struct LweParams extracted_lweparams; ///< lwe params if one extracts
+
+#ifdef __cplusplus
+
+    TLweParams(int32_t N, int32_t k, double alpha_min, double alpha_max);
+
+    ~TLweParams();
+
+    TLweParams(const TLweParams &) = delete;
+
+    void operator=(const TLweParams &) = delete;
+
+#endif
+};
+
+struct TLweSample {
+    TorusPolynomial *a; ///< array of length k+1: mask + right term
+    TorusPolynomial *b; ///< alias of a[k] to get the right term
+    double current_variance; ///< avg variance of the sample
+    const int32_t k;
+#ifdef __cplusplus
+
+    TLweSample(const TLweParams *params);
+
+    ~TLweSample();
+
+    TLweSample(const TLweSample &) = delete;
+
+    void operator=(const TLweSample &) = delete;
+
+#endif
+};
 
 
 // Idea:
@@ -15,7 +135,7 @@
 //  -- modulo 1 is mapped to mod 2^32, which is also native!
 // This looks much better than using float/doubles, where modulo 1 is not
 // natural at all.
-typedef int32_t Torus32; //avant uint32_t
+
 //typedef int64_t Torus64; //avant uint64_t
 struct LweParams;
 struct LweKey;
@@ -63,35 +183,9 @@ typedef struct TFheGateBootstrappingSecretKeySet TFheGateBootstrappingSecretKeyS
 
 
 
-struct LweParams {
-	const int32_t n;
-	const double alpha_min;//le plus petit bruit tq sur
-	const double alpha_max;//le plus gd bruit qui permet le déchiffrement
 
 
 
-//since all members are declared constant, a constructor is 
-//required in the structure.
-#ifdef __cplusplus
-	LweParams(int32_t n, double alpha_min, double alpha_max);
-	~LweParams();
-	LweParams(const LweParams&) = delete; //forbidden
-	LweParams& operator=(const LweParams& ) = delete; //forbidden
-#endif
-};
-
-struct LweSample {
-	Torus32* a; //-- the n coefs of the mask
-    Torus32 b;  //
-   	double current_variance; //-- average noise of the sample
-
-#ifdef __cplusplus
-   LweSample(const LweParams* params);
-   ~LweSample();
-   LweSample(const LweSample&)=delete;
-   LweSample& operator=(const LweSample&)=delete;
-#endif
-};
 
 
 
@@ -136,23 +230,31 @@ EXPORT void lweAddTo(LweSample* result, const LweSample* sample, const LweParams
 }
 
 
+//typedef unsigned long uint64_t1;
 
-EXPORT int32_t modSwitchFromTorus32(Torus32 phase, int32_t Msize){
+
+
+EXPORT int32_t modSwitchFromTorus32(Torus32 phase1, int32_t Msize){
     uint64_t interv = ((UINT64_C(1)<<63)/Msize)*2; // width of each intervall
     uint64_t half_interval = interv/2; // begin of the first intervall
-    uint64_t phase64 = (uint64_t(phase)<<32) + half_interval;
+    uint64_t phase64 = (uint64_t)phase1;
+    phase64 = (phase64 << 32) + half_interval;
+   // << 32) + half_interval;
     //floor to the nearest multiples of interv
-    return phase64/interv;
+    return phase64/interv
 }
 
 
 EXPORT TorusPolynomial* new_TorusPolynomial(const int32_t N) {
-    return new TorusPolynomial(N);
+    TorusPolynomial* tmp;
+    TorusPolynomial_init(tmp,N);
+    return tmp;
 }
-TorusPolynomial::TorusPolynomial(const int32_t N): N(N)
-{
-    this->coefsT = new Torus32[N]; 
-}
+
+// TorusPolynomial::TorusPolynomial(const int32_t N): N(N)
+// {
+//     this->coefsT = new Torus32[N]; 
+// }
 
 TLweSample *new_TLweSample(const TLweParams* params) {
     const int32_t k = params->k;
@@ -181,35 +283,55 @@ EXPORT void tfhe_createLweBootstrappingKey(LweBootstrappingKey* bk, const LweKey
 
 EXPORT void die_dramatically(const char* message);
 
-//torusPolynomialAddMulRFFT
-class FFT_Processor_fftw {
-    public:
+// // //torusPolynomialAddMulRFFT
+// class FFT_Processor_fftw {
+//     public:
+//     const int32_t _2N;
+//     const int32_t N;    
+//     const int32_t Ns2;
+//     private:
+//     double* rev_in;
+//     fftw_complex* rev_out;
+//     fftw_complex* in;
+//     double* out;
+//     fftw_plan p;
+//     fftw_plan rev_p;
+//     void plan_fftw();
+//     public:
+//     cplx* omegaxminus1;
+
+//     FFT_Processor_fftw(const int32_t N);
+//     void execute_reverse_int(cplx* res, const int32_t* a);
+//     void execute_reverse_torus32(cplx* res, const Torus32* a);
+//     void execute_direct_Torus32(Torus32* res, const cplx* a);
+//     ~FFT_Processor_fftw();
+// };
+
+struct cplx {
+    double real; // 实部
+    double imag; // 虚部
+};
+
+// 定义FFT_Processor_fftw结构体
+struct FFT_Processor_fftw {
     const int32_t _2N;
     const int32_t N;    
     const int32_t Ns2;
-    private:
     double* rev_in;
-    fftw_complex* rev_out;
-    fftw_complex* in;
+    struct cplx* rev_out;
+    struct cplx* in;
     double* out;
-    fftw_plan p;
-    fftw_plan rev_p;
-    void plan_fftw();
-    public:
-    cplx* omegaxminus1;
-
-    FFT_Processor_fftw(const int32_t N);
-    void execute_reverse_int(cplx* res, const int32_t* a);
-    void execute_reverse_torus32(cplx* res, const Torus32* a);
-    void execute_direct_Torus32(Torus32* res, const cplx* a);
-    ~FFT_Processor_fftw();
+    void (*plan_fftw)();
+    struct cplx* omegaxminus1;
 };
+
+
 /////  use the new method to represent the fushu
 typedef std::complex<double> cplx;
 struct LagrangeHalfCPolynomial_IMPL
 {
    double* coefsC;
-   FFT_Processor_fftw* proc;
+   struct FFT_Processor_fftw* proc;
 
    LagrangeHalfCPolynomial_IMPL(int32_t N);
    ~LagrangeHalfCPolynomial_IMPL();
