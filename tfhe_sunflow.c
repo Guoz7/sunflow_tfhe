@@ -104,9 +104,26 @@ struct TLweParams {
 #endif
 };
 
+struct TLweSample {
+    struct TorusPolynomial *a; ///< array of length k+1: mask + right term
+    struct TorusPolynomial *b; ///< alias of a[k] to get the right term
+    double current_variance; ///< avg variance of the sample
+    const int32_t k;
+#ifdef __cplusplus
+
+    TLweSample(const TLweParams *params);
+
+    ~TLweSample();
+
+    TLweSample(const TLweSample &) = delete;
+
+    void operator=(const TLweSample &) = delete;
+
+#endif
+};
 
 struct IntPolynomial {
-   const int32_t N;
+    int32_t N;
    int32_t* coefs;
 
 #ifdef __cplusplus   
@@ -118,6 +135,98 @@ struct IntPolynomial {
 };
 
 
+
+struct TGswParams {
+    const int32_t l; ///< decomp length
+    const int32_t Bgbit;///< log_2(Bg)
+    const int32_t Bg;///< decomposition base (must be a power of 2)
+    const int32_t halfBg; ///< Bg/2
+    const uint32_t maskMod; ///< Bg-1
+    const struct TLweParams *tlwe_params; ///< Params of each row
+    const int32_t kpl; ///< number of rows = (k+1)*l
+    Torus32 *h; ///< powers of Bgbit
+    uint32_t offset; ///< offset = Bg/2 * (2^(32-Bgbit) + 2^(32-2*Bgbit) + ... + 2^(32-l*Bgbit))
+
+#ifdef __cplusplus
+
+    TGswParams(int32_t l, int32_t Bgbit, const TLweParams *tlwe_params);
+
+    ~TGswParams();
+
+    TGswParams(const TGswParams &) = delete;
+
+    void operator=(const TGswParams &) = delete;
+
+#endif
+};
+
+struct TGswSample {
+    struct TLweSample *all_sample; ///< TLweSample* all_sample; (k+1)l TLwe Sample
+    struct TLweSample **bloc_sample;///< accès optionnel aux différents blocs de taille l.
+    // double current_variance;
+    const int32_t k;
+    const int32_t l;
+
+#ifdef __cplusplus
+
+    inline TGswSample(TLweSample *all_sample, TLweSample **bloc_sample, const int32_t k, const int32_t l) :
+            all_sample(all_sample),
+            bloc_sample(bloc_sample),
+            k(k), l(l) {}
+
+    inline ~TGswSample() {}
+
+    TGswSample(const TGswSample &) = delete;
+
+    void operator=(const TGswSample &) = delete;
+
+#endif
+};
+
+
+struct LweKeySwitchKey {
+    int32_t n; ///< length of the input key: s'
+    int32_t t; ///< decomposition length
+    int32_t basebit; ///< log_2(base)
+    int32_t base; ///< decomposition base: a power of 2 
+    const struct  LweParams* out_params; ///< params of the output key s 
+    struct LweSample* ks0_raw; //tableau qui contient tout les Lwe samples de taille nlbase
+    struct LweSample** ks1_raw;// de taille nl  pointe vers un tableau ks0_raw dont les cases sont espaceés de base positions
+    struct LweSample*** ks; ///< the keyswitch elements: a n.l.base matrix
+    // de taille n pointe vers ks1 un tableau dont les cases sont espaceés de ell positions
+
+#ifdef __cplusplus
+    LweKeySwitchKey(int32_t n, int32_t t, int32_t basebit, const LweParams* out_params, LweSample* ks0_raw);
+    ~LweKeySwitchKey();
+    LweKeySwitchKey(const LweKeySwitchKey&) = delete;
+    void operator=(const LweKeySwitchKey&) = delete;
+#endif
+};
+
+struct LweBootstrappingKey{
+    const struct LweParams* in_out_params; ///< paramètre de l'input et de l'output. key: s
+    const  struct TGswParams* bk_params; ///< params of the Gsw elems in bk. key: s"
+    const struct TLweParams* accum_params; ///< params of the accum variable key: s"
+    const struct LweParams* extract_params; ///< params after extraction: key: s' 
+    struct TGswSample* bk; ///< the bootstrapping key (s->s")
+    struct LweKeySwitchKey* ks; ///< the keyswitch key (s'->s)
+
+
+#ifdef __cplusplus
+   LweBootstrappingKey(const LweParams* in_out_params, 
+    const TGswParams* bk_params,
+    const TLweParams* accum_params,
+    const LweParams* extract_params,
+    TGswSample* bk,
+    LweKeySwitchKey* ks);
+    ~LweBootstrappingKey();
+    LweBootstrappingKey(const LweBootstrappingKey&) = delete;
+    void operator=(const LweBootstrappingKey&) = delete;
+  
+#endif
+
+
+};
 /** This structure represents an torus polynomial modulo X^N+1 */
 
 
@@ -199,23 +308,7 @@ void TorusPolynomial_destroy(struct TorusPolynomial* poly) {
     free(poly->coefsT);
 }
 
-struct TLweSample {
-    TorusPolynomial *a; ///< array of length k+1: mask + right term
-    TorusPolynomial *b; ///< alias of a[k] to get the right term
-    double current_variance; ///< avg variance of the sample
-    const int32_t k;
-#ifdef __cplusplus
 
-    TLweSample(const TLweParams *params);
-
-    ~TLweSample();
-
-    TLweSample(const TLweSample &) = delete;
-
-    void operator=(const TLweSample &) = delete;
-
-#endif
-};
 
 
 
@@ -422,17 +515,32 @@ EXPORT IntPolynomial* alloc_IntPolynomial_array(int32_t nbelts) {
     return (IntPolynomial*) malloc(nbelts*sizeof(IntPolynomial));
 }
 
-IntPolynomial::IntPolynomial(const int32_t N): N(N)
-{
-    this->coefs = new int32_t[N]; 
-}
+// IntPolynomial::IntPolynomial(const int32_t N): N(N)
+// {
+//     this->coefs = new int32_t[N]; 
+// }
 
-EXPORT void init_IntPolynomial_array(int32_t nbelts, IntPolynomial* obj, const int32_t N) {
-    for (int32_t i=0; i<nbelts; i++) {
-	new(obj+i) IntPolynomial(N);
+// EXPORT void init_IntPolynomial_array(int32_t nbelts, IntPolynomial* obj, const int32_t N) {
+//     for (int32_t i=0; i<nbelts; i++) {
+// 	new(obj+i) IntPolynomial(N);
+//     }
+// }
+
+void init_IntPolynomial_array(int32_t nbelts, struct IntPolynomial* obj, const int32_t N) {
+    for (int32_t i = 0; i < nbelts; i++) {
+        // 为每个元素分配内存
+        obj[i].coefs = (int32_t*)malloc(N * sizeof(int32_t));
+
+        // 初始化 N
+        obj[i].N = N;
+
+        // 在这里可以根据需要对 coefs 数组进行初始化
+        // 例如，可以将 coefs 数组的元素全部初始化为0
+        for (int32_t j = 0; j < N; j++) {
+            obj[i].coefs[j] = 0;
+        }
     }
 }
-
 
 EXPORT IntPolynomial* new_IntPolynomial_array(int32_t nbelts, const int32_t N) {
     IntPolynomial* obj = alloc_IntPolynomial_array(nbelts);
@@ -787,10 +895,10 @@ EXPORT void tLweExtractLweSample(LweSample* result, const TLweSample* x, const L
 //     return (TorusPolynomial*) malloc(nbelts*sizeof(TorusPolynomial));
 // }
 
-TorusPolynomial::TorusPolynomial(const int32_t N): N(N)
-{
-    this->coefsT = new Torus32[N]; 
-}
+// TorusPolynomial::TorusPolynomial(const int32_t N): N(N)
+// {
+//     this->coefsT = new Torus32[N]; 
+// }
 
 // EXPORT void init_TorusPolynomial_array(int32_t nbelts, TorusPolynomial* obj, const int32_t N) {
 //     for (int32_t i=0; i<nbelts; i++) {
@@ -856,7 +964,8 @@ EXPORT void tfhe_bootstrap_woKS(LweSample *result,
     const int32_t n = in_params->n;
 
     TorusPolynomial *testvect = new_TorusPolynomial(N);
-    int32_t *bara = new int32_t[N];
+    //int32_t *bara = new int32_t[N];
+    int32_t* bara = (int32_t*)malloc(size * sizeof(int32_t));
 
     int32_t barb = modSwitchFromTorus32(x->b, Nx2);
     for (int32_t i = 0; i < n; i++) {
@@ -955,4 +1064,5 @@ int main()
     bool c_de = bootsSymDecrypt(c_en,key);
     //delete_gate_bootstrapping_secret_keyset(key);
     //delete_gate_bootstrapping_parameters(params);
-}
+    return 0;
+};
