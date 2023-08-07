@@ -391,12 +391,15 @@ EXPORT void die_dramatically(const char* message);
 // };
 
 EXPORT void IntPolynomial_ifft(LagrangeHalfCPolynomial* result, const IntPolynomial* p) {
+    fp1024_fftw.execute_reverse_int = execute_reverse_int;
     fp1024_fftw.execute_reverse_int(((struct LagrangeHalfCPolynomial_IMPL*)result)->coefsC, p->coefs);
 }
 EXPORT void TorusPolynomial_ifft(LagrangeHalfCPolynomial* result, const TorusPolynomial* p) {
+    fp1024_fftw.execute_reverse_torus32 = execute_reverse_torus32;  
     fp1024_fftw.execute_reverse_torus32(((struct LagrangeHalfCPolynomial_IMPL*)result)->coefsC, p->coefsT);
 }
 EXPORT void TorusPolynomial_fft(TorusPolynomial* result, const LagrangeHalfCPolynomial* p) {
+    fp1024_fftw.execute_direct_Torus32 = execute_direct_Torus32;
     fp1024_fftw.execute_direct_Torus32(result->coefsT, ((struct LagrangeHalfCPolynomial_IMPL*)p)->coefsC);
 }
 
