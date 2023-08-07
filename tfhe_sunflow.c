@@ -5,13 +5,13 @@
 
 
 
-#include "lagrangehalfc.h"
+#include "lagrangehalfc_impl.h"
 /*
 #include "ni.h"
 #include "ni.c"
 #include "sdram.h"
 */
-typedef int32_t Torus32; //avant uint32_t
+
 
 
 
@@ -119,17 +119,6 @@ struct IntPolynomial {
 
 
 /** This structure represents an torus polynomial modulo X^N+1 */
-struct TorusPolynomial {
-    int32_t N;
-   Torus32* coefsT;
-
-#ifdef __cplusplus   
-   TorusPolynomial(const int32_t N);
-   ~TorusPolynomial();
-   TorusPolynomial(const TorusPolynomial&) = delete; //forbidden 
-   TorusPolynomial* operator=(const TorusPolynomial&) = delete; //forbidden
-#endif
-};
 
 
 /** 
@@ -402,13 +391,13 @@ EXPORT void die_dramatically(const char* message);
 // };
 
 EXPORT void IntPolynomial_ifft(LagrangeHalfCPolynomial* result, const IntPolynomial* p) {
-    fp1024_fftw.execute_reverse_int(((LagrangeHalfCPolynomial_IMPL*)result)->coefsC, p->coefs);
+    fp1024_fftw.execute_reverse_int(((struct LagrangeHalfCPolynomial_IMPL*)result)->coefsC, p->coefs);
 }
 EXPORT void TorusPolynomial_ifft(LagrangeHalfCPolynomial* result, const TorusPolynomial* p) {
-    fp1024_fftw.execute_reverse_torus32(((LagrangeHalfCPolynomial_IMPL*)result)->coefsC, p->coefsT);
+    fp1024_fftw.execute_reverse_torus32(((struct LagrangeHalfCPolynomial_IMPL*)result)->coefsC, p->coefsT);
 }
 EXPORT void TorusPolynomial_fft(TorusPolynomial* result, const LagrangeHalfCPolynomial* p) {
-    fp1024_fftw.execute_direct_Torus32(result->coefsT, ((LagrangeHalfCPolynomial_IMPL*)p)->coefsC);
+    fp1024_fftw.execute_direct_Torus32(result->coefsT, ((struct LagrangeHalfCPolynomial_IMPL*)p)->coefsC);
 }
 
 
