@@ -1,6 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <fftw3.h>
+
+
+
+#include "lagrangehalfc.h"
 /*
 #include "ni.h"
 #include "ni.c"
@@ -48,16 +53,6 @@ struct TorusPolynomial {
 #endif
 };
 
-// TorusPolynomial的初始化函数
-void TorusPolynomial_init(TorusPolynomial* poly,  int32_t N) {
-    poly->N = N;
-    poly->coefsT = (Torus32*)malloc(N * sizeof(Torus32));
-}
-
-// TorusPolynomial的清理函数（类似于析构函数）
-void TorusPolynomial_destroy(struct TorusPolynomial* poly) {
-    free(poly->coefsT);
-}
 
 
 
@@ -109,23 +104,46 @@ struct TLweParams {
 #endif
 };
 
-struct TLweSample {
-    TorusPolynomial *a; ///< array of length k+1: mask + right term
-    TorusPolynomial *b; ///< alias of a[k] to get the right term
-    double current_variance; ///< avg variance of the sample
-    const int32_t k;
-#ifdef __cplusplus
 
-    TLweSample(const TLweParams *params);
+struct IntPolynomial {
+   const int32_t N;
+   int32_t* coefs;
 
-    ~TLweSample();
-
-    TLweSample(const TLweSample &) = delete;
-
-    void operator=(const TLweSample &) = delete;
-
+#ifdef __cplusplus   
+   IntPolynomial(const int32_t N);
+   ~IntPolynomial();
+   IntPolynomial(const IntPolynomial&) = delete; //forbidden 
+   IntPolynomial* operator=(const IntPolynomial&) = delete; //forbidden
 #endif
 };
+
+
+/** This structure represents an torus polynomial modulo X^N+1 */
+struct TorusPolynomial {
+    int32_t N;
+   Torus32* coefsT;
+
+#ifdef __cplusplus   
+   TorusPolynomial(const int32_t N);
+   ~TorusPolynomial();
+   TorusPolynomial(const TorusPolynomial&) = delete; //forbidden 
+   TorusPolynomial* operator=(const TorusPolynomial&) = delete; //forbidden
+#endif
+};
+
+
+/** 
+ * This structure is used for FFT operations, and is a representation
+ * over C of a polynomial in R[X]/X^N+1
+ * This type is meant to be specialized, and all implementations of the structure must be compatible 
+ * (reinterpret_cast) with this one. Namely, they should contain at most 2 pointers 
+ */
+struct LagrangeHalfCPolynomial
+{
+   void* data;
+   void* precomp;
+};
+
 
 
 // Idea:
@@ -181,8 +199,34 @@ typedef struct TFheGateBootstrappingParameterSet TFheGateBootstrappingParameterS
 typedef struct TFheGateBootstrappingCloudKeySet TFheGateBootstrappingCloudKeySet;
 typedef struct TFheGateBootstrappingSecretKeySet TFheGateBootstrappingSecretKeySet;
 
+// TorusPolynomial的初始化函数
+void TorusPolynomial_init(TorusPolynomial* poly,  int32_t N) {
+    poly->N = N;
+    poly->coefsT = (Torus32*)malloc(N * sizeof(Torus32));
+}
 
+// TorusPolynomial的清理函数（类似于析构函数）
+void TorusPolynomial_destroy(struct TorusPolynomial* poly) {
+    free(poly->coefsT);
+}
 
+struct TLweSample {
+    TorusPolynomial *a; ///< array of length k+1: mask + right term
+    TorusPolynomial *b; ///< alias of a[k] to get the right term
+    double current_variance; ///< avg variance of the sample
+    const int32_t k;
+#ifdef __cplusplus
+
+    TLweSample(const TLweParams *params);
+
+    ~TLweSample();
+
+    TLweSample(const TLweSample &) = delete;
+
+    void operator=(const TLweSample &) = delete;
+
+#endif
+};
 
 
 
@@ -193,7 +237,7 @@ typedef struct TFheGateBootstrappingSecretKeySet TFheGateBootstrappingSecretKeyS
 #include "tfhe_io.h"
 
 
-//  wle function
+//  wle functionfnew_TorusPolynomial_array
 
 EXPORT void lweNoiselessTrivial(LweSample* result, Torus32 mu, const LweParams* params){
     const int32_t n = params->n;
@@ -241,7 +285,7 @@ EXPORT int32_t modSwitchFromTorus32(Torus32 phase1, int32_t Msize){
     phase64 = (phase64 << 32) + half_interval;
    // << 32) + half_interval;
     //floor to the nearest multiples of interv
-    return phase64/interv
+    return phase64/interv;
 }
 
 
@@ -256,11 +300,29 @@ EXPORT TorusPolynomial* new_TorusPolynomial(const int32_t N) {
 //     this->coefsT = new Torus32[N]; 
 // }
 
+EXPORT TorusPolynomial* alloc_TorusPolynomial_array(int32_t nbelts) {
+    return (TorusPolynomial*) malloc(nbelts*sizeof(TorusPolynomial));
+}
+
+void init_TorusPolynomial_array(int32_t nbelts, struct TorusPolynomial* obj, const int32_t N) {
+    for (int32_t i = 0; i < nbelts; i++) {
+        TorusPolynomial_init(&obj[i], N);
+    }
+}
+
+
+EXPORT TorusPolynomial* new_TorusPolynomial_array(int32_t nbelts, const int32_t N) {
+    TorusPolynomial* obj = alloc_TorusPolynomial_array(nbelts);
+    init_TorusPolynomial_array(nbelts,obj,N);
+    return obj;
+}
+
+
 TLweSample *new_TLweSample(const TLweParams* params) {
     const int32_t k = params->k;
     TLweSample* result = (TLweSample*) malloc(sizeof(TLweSample));
     result->a = new_TorusPolynomial_array(k+1, params->N);
-    result->b = a + k;
+    result->b = result->a + k;
     result->current_variance = 0.;
     return result;
 }
@@ -307,35 +369,37 @@ EXPORT void die_dramatically(const char* message);
 //     ~FFT_Processor_fftw();
 // };
 
-struct cplx {
-    double real; // 实部
-    double imag; // 虚部
-};
+// struct cplx {
+//     double real; // 实部
+//     double imag; // 虚部
+// };
 
-// 定义FFT_Processor_fftw结构体
-struct FFT_Processor_fftw {
-    const int32_t _2N;
-    const int32_t N;    
-    const int32_t Ns2;
-    double* rev_in;
-    struct cplx* rev_out;
-    struct cplx* in;
-    double* out;
-    void (*plan_fftw)();
-    struct cplx* omegaxminus1;
-};
+// // 定义FFT_Processor_fftw结构体
+// struct FFT_Processor_fftw {
+//     const int32_t _2N;
+//     const int32_t N;    
+//     const int32_t Ns2;
+//     double* rev_in;
+//     struct cplx* rev_out;
+//     struct cplx* in;
+//     double* out;
+//     void (*plan_fftw)();
+//     struct cplx* omegaxminus1;
+// };
 
+// thread_local struct FFT_Processor_fftw fp1024_fftw;
 
 /////  use the new method to represent the fushu
-typedef std::complex<double> cplx;
-struct LagrangeHalfCPolynomial_IMPL
-{
-   double* coefsC;
-   struct FFT_Processor_fftw* proc;
 
-   LagrangeHalfCPolynomial_IMPL(int32_t N);
-   ~LagrangeHalfCPolynomial_IMPL();
-};
+//typedef std::complex<double> cplx;
+// struct LagrangeHalfCPolynomial_IMPL
+// {
+//    double* coefsC;
+//    struct FFT_Processor_fftw* proc;
+
+//    LagrangeHalfCPolynomial_IMPL(int32_t N);
+//    ~LagrangeHalfCPolynomial_IMPL();
+// };
 
 EXPORT void IntPolynomial_ifft(LagrangeHalfCPolynomial* result, const IntPolynomial* p) {
     fp1024_fftw.execute_reverse_int(((LagrangeHalfCPolynomial_IMPL*)result)->coefsC, p->coefs);
@@ -727,20 +791,27 @@ EXPORT void tLweExtractLweSample(LweSample* result, const TLweSample* x, const L
     tLweExtractLweSampleIndex(result, x, 0, params, rparams);
 }
 
-EXPORT TorusPolynomial* alloc_TorusPolynomial_array(int32_t nbelts) {
-    return (TorusPolynomial*) malloc(nbelts*sizeof(TorusPolynomial));
-}
+// EXPORT TorusPolynomial* alloc_TorusPolynomial_array(int32_t nbelts) {
+//     return (TorusPolynomial*) malloc(nbelts*sizeof(TorusPolynomial));
+// }
 
 TorusPolynomial::TorusPolynomial(const int32_t N): N(N)
 {
     this->coefsT = new Torus32[N]; 
 }
 
-EXPORT void init_TorusPolynomial_array(int32_t nbelts, TorusPolynomial* obj, const int32_t N) {
-    for (int32_t i=0; i<nbelts; i++) {
-	new(obj+i) TorusPolynomial(N);
-    }
-}
+// EXPORT void init_TorusPolynomial_array(int32_t nbelts, TorusPolynomial* obj, const int32_t N) {
+//     for (int32_t i=0; i<nbelts; i++) {
+// 	new(obj+i) TorusPolynomial(N);
+//     }
+// }
+
+// void init_TorusPolynomial_array(int32_t nbelts, struct TorusPolynomial* obj, const int32_t N) {
+//     for (int32_t i = 0; i < nbelts; i++) {
+//         TorusPolynomial_init(&obj[i], N);
+//     }
+// }
+
 
 
 EXPORT TorusPolynomial* new_TorusPolynomial_array(int32_t nbelts, const int32_t N) {
