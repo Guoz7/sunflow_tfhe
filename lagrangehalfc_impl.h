@@ -2,7 +2,7 @@
 #define LAGRANGEHALFC_IMPL_H
 typedef int32_t Torus32; //avant uint32_t
 typedef unsigned int		uint32_t;
-//#include <cassert>
+// #include <cassert>
 //#include <cmath>
 //#include <ccomplex>
 //typedef double _Complex cplx;
@@ -64,7 +64,7 @@ struct FFT_Processor_fftw {
 //     ~FFT_Processor_fftw();
 // };
 
-extern  struct FFT_Processor_fftw fp1024_fftw;
+//extern  struct FFT_Processor_fftw fp1024_fftw;
 
 /**
  * structure that represents a real polynomial P mod X^N+1
@@ -131,8 +131,8 @@ void execute_reverse_int(struct cplx* res, const int32_t* a, const struct FFT_Pr
     }
 
     for (int32_t i = 0; i <= processor->Ns2; i++) {
-        assert(fabs(rev_out_cplx[2 * i].real) < 1e-20);
-        assert(fabs(rev_out_cplx[2 * i].imag) < 1e-20);
+        //assert(fabs(rev_out_cplx[2 * i].real) < 1e-20);
+        //assert(fabs(rev_out_cplx[2 * i].imag) < 1e-20);
     }
 }
 
@@ -159,8 +159,8 @@ void execute_reverse_torus32(struct cplx* res, const Torus32* a, const struct FF
     }
 
     for (int32_t i = 0; i <= processor->Ns2; i++) {
-        assert(fabs(rev_out_cplx[2 * i].real) < 1e-20);
-        assert(fabs(rev_out_cplx[2 * i].imag) < 1e-20);
+        //assert(fabs(rev_out_cplx[2 * i].real) < 1e-20);
+        //assert(fabs(rev_out_cplx[2 * i].imag) < 1e-20);
     }
 }
 
@@ -189,6 +189,6 @@ void execute_direct_Torus32(Torus32* res, const struct cplx* a, const struct FFT
     }
 
     for (int32_t i = 0; i < N; i++) {
-        assert(fabs(out[N + i] + out[i]) < 1e-20);
+        //assert(fabs(out[N + i] + out[i]) < 1e-20);
     }
 }

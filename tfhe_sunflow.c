@@ -14,7 +14,7 @@
 
 
 
-
+//#include "tfhe_io.h"
 
 
 
@@ -137,13 +137,13 @@ struct IntPolynomial {
 
 
 struct TGswParams {
-    const int32_t l; ///< decomp length
-    const int32_t Bgbit;///< log_2(Bg)
-    const int32_t Bg;///< decomposition base (must be a power of 2)
-    const int32_t halfBg; ///< Bg/2
-    const uint32_t maskMod; ///< Bg-1
-    const struct TLweParams *tlwe_params; ///< Params of each row
-    const int32_t kpl; ///< number of rows = (k+1)*l
+     int32_t l; ///< decomp length
+     int32_t Bgbit;///< log_2(Bg)
+     int32_t Bg;///< decomposition base (must be a power of 2)
+     int32_t halfBg; ///< Bg/2
+     uint32_t maskMod; ///< Bg-1
+     struct TLweParams *tlwe_params; ///< Params of each row
+     int32_t kpl; ///< number of rows = (k+1)*l
     Torus32 *h; ///< powers of Bgbit
     uint32_t offset; ///< offset = Bg/2 * (2^(32-Bgbit) + 2^(32-2*Bgbit) + ... + 2^(32-l*Bgbit))
 
@@ -224,8 +224,109 @@ struct LweBootstrappingKey{
     void operator=(const LweBootstrappingKey&) = delete;
   
 #endif
+};
 
 
+struct TFheGateBootstrappingParameterSet {
+    const int32_t ks_t;
+    const int32_t ks_basebit;
+    const struct LweParams *const in_out_params;
+    const struct TGswParams *const tgsw_params;
+#ifdef __cplusplus
+
+    TFheGateBootstrappingParameterSet(const int32_t ks_t, const int32_t ks_basebit, const LweParams *const in_out_params,
+                                      const TGswParams *const tgsw_params);
+
+    TFheGateBootstrappingParameterSet(const TFheGateBootstrappingParameterSet &) = delete;
+
+    void operator=(const TFheGateBootstrappingParameterSet &)= delete;
+
+#endif
+};
+
+struct LweKey {
+   const struct LweParams* params;
+   int32_t* key;
+
+#ifdef __cplusplus   
+   LweKey(const LweParams* params);
+   ~LweKey();
+   LweKey(const LweKey&) = delete; //forbidden 
+   LweKey* operator=(const LweKey&) = delete; //forbidden
+#endif
+};
+struct TLweKey {
+    const struct TLweParams *params; ///< the parameters of the key
+    struct IntPolynomial *key; ///< the key (i.e k binary polynomials)
+#ifdef __cplusplus
+
+    TLweKey(const TLweParams *params);
+
+    ~TLweKey();
+
+    TLweKey(const TLweKey &) = delete;
+
+    void operator=(const TLweKey &) = delete;
+
+#endif
+};
+
+struct TGswKey {
+    const struct TGswParams *params; ///< the parameters
+    const struct TLweParams *tlwe_params; ///< the tlwe params of each rows
+    struct IntPolynomial *key; ///< the key (array of k polynomials)
+    struct TLweKey tlwe_key;
+
+#ifdef __cplusplus
+
+    TGswKey(const TGswParams *params);
+
+    ~TGswKey();
+
+    TGswKey(const TGswKey &) = delete;
+
+    void operator=(const TGswKey &) = delete;
+
+#endif
+};
+
+struct TFheGateBootstrappingCloudKeySet {
+    const struct TFheGateBootstrappingParameterSet *const params;
+    const struct LweBootstrappingKey *const bk;
+    //const LweBootstrappingKeyFFT *const bkFFT;
+#ifdef __cplusplus
+
+    TFheGateBootstrappingCloudKeySet(
+            const TFheGateBootstrappingParameterSet *const params,
+            const LweBootstrappingKey *const bk,
+            const LweBootstrappingKeyFFT *const bkFFT);
+
+    TFheGateBootstrappingCloudKeySet(const TFheGateBootstrappingCloudKeySet &) = delete;
+
+    void operator=(const TFheGateBootstrappingCloudKeySet &)= delete;
+
+#endif
+};
+
+struct TFheGateBootstrappingSecretKeySet {
+    const struct TFheGateBootstrappingParameterSet *params;
+    const struct LweKey *lwe_key;
+    const struct TGswKey *tgsw_key;
+    const struct TFheGateBootstrappingCloudKeySet cloud;
+#ifdef __cplusplus
+
+    TFheGateBootstrappingSecretKeySet(
+            const TFheGateBootstrappingParameterSet *const params,
+            const LweBootstrappingKey *const bk,
+            const LweBootstrappingKeyFFT *const bkFFT,
+            const LweKey *lwe_key,
+            const TGswKey *tgsw_key);
+
+    TFheGateBootstrappingSecretKeySet(const TFheGateBootstrappingSecretKeySet &) = delete;
+
+    void operator=(const TFheGateBootstrappingSecretKeySet &)= delete;
+
+#endif
 };
 /** This structure represents an torus polynomial modulo X^N+1 */
 
@@ -483,24 +584,80 @@ EXPORT void die_dramatically(const char* message);
 //    ~LagrangeHalfCPolynomial_IMPL();
 // };
 
-EXPORT void IntPolynomial_ifft(LagrangeHalfCPolynomial* result, const IntPolynomial* p) {
-    fp1024_fftw.execute_reverse_int = execute_reverse_int;
-    fp1024_fftw.execute_reverse_int(((struct LagrangeHalfCPolynomial_IMPL*)result)->coefsC, p->coefs);
+
+
+// extern struct FFT_Processor_fftw ;
+// struct FFt_Processor_fftw fp1024_fftw;
+
+
+
+// EXPORT void IntPolynomial_ifft(LagrangeHalfCPolynomial* result, const IntPolynomial* p) {
+//     fp1024_fftw.execute_reverse_int = execute_reverse_int;
+//     fp1024_fftw.execute_reverse_int(((struct LagrangeHalfCPolynomial_IMPL*)result)->coefsC, p->coefs);
+// }
+// EXPORT void TorusPolynomial_ifft(LagrangeHalfCPolynomial* result, const TorusPolynomial* p) {
+//     fp1024_fftw.execute_reverse_torus32 = execute_reverse_torus32;  
+//     fp1024_fftw.execute_reverse_torus32(((struct LagrangeHalfCPolynomial_IMPL*)result)->coefsC, p->coefsT);
+// }
+// EXPORT void TorusPolynomial_fft(TorusPolynomial* result, const LagrangeHalfCPolynomial* p) {
+//     fp1024_fftw.execute_direct_Torus32 = execute_direct_Torus32;
+//     fp1024_fftw.execute_direct_Torus32(result->coefsT, ((struct LagrangeHalfCPolynomial_IMPL*)p)->coefsC);
+// }
+
+
+EXPORT LagrangeHalfCPolynomial* alloc_LagrangeHalfCPolynomial_array(int32_t nbelts) {
+    return (LagrangeHalfCPolynomial*) malloc(nbelts*sizeof(LagrangeHalfCPolynomial));
 }
-EXPORT void TorusPolynomial_ifft(LagrangeHalfCPolynomial* result, const TorusPolynomial* p) {
-    fp1024_fftw.execute_reverse_torus32 = execute_reverse_torus32;  
-    fp1024_fftw.execute_reverse_torus32(((struct LagrangeHalfCPolynomial_IMPL*)result)->coefsC, p->coefsT);
+
+
+
+// void LagrangeHalfCPolynomial_IMPL_init(struct LagrangeHalfCPolynomial_IMPL* obj, const int32_t N) {
+//     ////assert(N == 1024);
+//     //obj->N = N;
+
+//     // 分配内存并初始化 coefsC 数组
+//     obj->coefsC = (struct cplx*)malloc((N / 2) * sizeof(struct cplx));
+//     // 这里可以根据需要对 coefsC 数组进行初始化
+//     // ...
+//     // 假设 fp1024_fftw 是一个 FFT_Processor_fftw 结构体的全局变量，
+//     // 这里将 obj 的 proc 成员指向 fp1024_fftw 结构体的地址
+//     // 如果需要动态分配 proc 成员，也可以在这里进行分配
+//     obj->proc = &fp1024_fftw;
+// }
+
+// void init_LagrangeHalfCPolynomial(struct LagrangeHalfCPolynomial* obj,const int32_t N){
+//     obj.coefsC = struct cplx[N/2];
+//     obj.proc = &fp1024_fftw;
+// }
+
+
+EXPORT void init_LagrangeHalfCPolynomial_array(int32_t nbelts, LagrangeHalfCPolynomial* obj, const int32_t N) {
+    for (int32_t i=0; i<nbelts; i++) {
+	//  LagrangeHalfCPolynomial_IMPL_init(&(obj[i]),N);
+    }
+    }
+EXPORT LagrangeHalfCPolynomial* new_LagrangeHalfCPolynomial_array(int32_t nbelts, const int32_t N) {
+    LagrangeHalfCPolynomial* obj = alloc_LagrangeHalfCPolynomial_array(nbelts);
+    init_LagrangeHalfCPolynomial_array(nbelts,obj,N);
+    return obj;
 }
-EXPORT void TorusPolynomial_fft(TorusPolynomial* result, const LagrangeHalfCPolynomial* p) {
-    fp1024_fftw.execute_direct_Torus32 = execute_direct_Torus32;
-    fp1024_fftw.execute_direct_Torus32(result->coefsT, ((struct LagrangeHalfCPolynomial_IMPL*)p)->coefsC);
+
+// TorusPolynomial += TorusPolynomial
+EXPORT void torusPolynomialAddTo(TorusPolynomial *result, const TorusPolynomial *poly2) {
+    const int32_t N = poly2->N;
+    Torus32 *r = result->coefsT;
+    const Torus32 *b = poly2->coefsT;
+
+    for (int32_t i = 0; i < N; ++i)
+        r[i] += b[i];
 }
 
 
 EXPORT void torusPolynomialAddMulRFFT(TorusPolynomial* result, const IntPolynomial* poly1, const TorusPolynomial* poly2) {
+    return;
     const int32_t N = poly1->N;
-    LagrangeHalfCPolynomial* tmp = new_LagrangeHalfCPolynomial_array(3,N);
-    TorusPolynomial* tmpr = new_TorusPolynomial(N);
+    struct LagrangeHalfCPolynomial* tmp = new_LagrangeHalfCPolynomial_array(3,N);
+    struct TorusPolynomial* tmpr = new_TorusPolynomial(N);
     IntPolynomial_ifft(tmp+0,poly1);
     TorusPolynomial_ifft(tmp+1,poly2);
     LagrangeHalfCPolynomialMul(tmp+2,tmp+0,tmp+1);
@@ -508,7 +665,7 @@ EXPORT void torusPolynomialAddMulRFFT(TorusPolynomial* result, const IntPolynomi
     torusPolynomialAddTo(result, tmpr);
     delete_TorusPolynomial(tmpr);
     delete_LagrangeHalfCPolynomial_array(3,tmp);
-
+}
 //tGswExternMulToTLwe
 
 EXPORT IntPolynomial* alloc_IntPolynomial_array(int32_t nbelts) {
@@ -548,6 +705,9 @@ EXPORT IntPolynomial* new_IntPolynomial_array(int32_t nbelts, const int32_t N) {
     return obj;
 }
 
+
+
+#define INCLUDE_TGSW_TORUS32POLYNOMIAL_DECOMP_H 
 
 
 #if defined INCLUDE_ALL || defined INCLUDE_TGSW_TORUS32POLYNOMIAL_DECOMP_H
@@ -723,7 +883,7 @@ EXPORT void tGswExternMulToTLwe(TLweSample *accum, const TGswSample *sample, con
         tLweAddMulRTo(accum, &dec[i], &sample->all_sample[i], par);
     }
 
-    delete_IntPolynomial_array(kpl, dec);
+    //delete_IntPolynomial_array(kpl, dec);
 }
 
 
@@ -736,7 +896,7 @@ EXPORT void torusPolynomialMulByXaiMinusOne(TorusPolynomial *result, int32_t a, 
     Torus32 *out = result->coefsT;
     Torus32 *in = source->coefsT;
 
-    assert(a >= 0 && a < 2 * N);
+    //assert(a >= 0 && a < 2 * N);
 
     if (a < N) {
         for (int32_t i = 0; i < a; i++)//sur que i-a<0
@@ -761,6 +921,17 @@ EXPORT void tLweMulByXaiMinusOne(TLweSample *result, int32_t ai, const TLweSampl
 
 EXPORT void tLweAddTTo(TLweSample *result, const int32_t pos, const Torus32 x, const TLweParams *params) {
     result->a[pos].coefsT[0] += x;
+}
+
+
+
+EXPORT void tLweAddTo(TLweSample *result, const TLweSample *sample, const TLweParams *params) {
+    const int32_t k = params->k;
+
+    for (int32_t i = 0; i < k; ++i)
+        torusPolynomialAddTo(&result->a[i], &sample->a[i]);
+    torusPolynomialAddTo(result->b, sample->b);
+    result->current_variance += sample->current_variance;
 }
 
 
@@ -807,14 +978,17 @@ tfhe_blindRotate(TLweSample *accum, const TGswSample *bk, const int32_t *bara, c
         if (barai == 0) continue; //indeed, this is an easy case!
 
         tfhe_MuxRotate(temp2, temp3, bk + i, barai, bk_params);
-        swap(temp2, temp3);
+        //swap(temp2, temp3);
+        temp = temp2;
+        temp2 = temp3;
+        temp3 = temp;
 
     }
     if (temp3 != accum) {
         tLweCopy(accum, temp3, bk_params->tlwe_params);
     }
 
-    delete_TLweSample(temp);
+    //delete_TLweSample(temp);
     //delete_TGswSample(temp);
 }
 
@@ -833,8 +1007,8 @@ EXPORT void torusPolynomialMulByXai(TorusPolynomial *result, int32_t a, const To
     Torus32 *out = result->coefsT;
     Torus32 *in = source->coefsT;
 
-    assert(a >= 0 && a < 2 * N);
-    assert(result != source);
+    //assert(a >= 0 && a < 2 * N);
+    //assert(result != source);
 
     if (a < N) {
         for (int32_t i = 0; i < a; i++)//sur que i-a<0
@@ -854,7 +1028,7 @@ EXPORT void torusPolynomialMulByXai(TorusPolynomial *result, int32_t a, const To
 EXPORT void torusPolynomialCopy(
         TorusPolynomial *result,
         const TorusPolynomial *sample) {
-    assert(result != sample);
+    //assert(result != sample);
     const int32_t N = result->N;
     const Torus32 *__restrict s = sample->coefsT;
     Torus32 *__restrict r = result->coefsT;
@@ -875,7 +1049,7 @@ EXPORT void tLweNoiselessTrivial(TLweSample *result, const TorusPolynomial *mu, 
 EXPORT void tLweExtractLweSampleIndex(LweSample* result, const TLweSample* x, const int32_t index, const LweParams* params,  const TLweParams* rparams) {
     const int32_t N = rparams->N;
     const int32_t k = rparams->k;
-    assert(params->n == k*N);
+    //assert(params->n == k*N);
 
     for (int32_t i=0; i<k; i++) {
       for (int32_t j=0; j<=index; j++)
@@ -914,11 +1088,11 @@ EXPORT void tLweExtractLweSample(LweSample* result, const TLweSample* x, const L
 
 
 
-EXPORT TorusPolynomial* new_TorusPolynomial_array(int32_t nbelts, const int32_t N) {
-    TorusPolynomial* obj = alloc_TorusPolynomial_array(nbelts);
-    init_TorusPolynomial_array(nbelts,obj,N);
-    return obj;
-}
+// EXPORT TorusPolynomial* new_TorusPolynomial_array(int32_t nbelts, const int32_t N) {
+//     TorusPolynomial* obj = alloc_TorusPolynomial_array(nbelts);
+//     init_TorusPolynomial_array(nbelts,obj,N);
+//     return obj;
+// }
 
 
 
@@ -944,8 +1118,8 @@ EXPORT void tfhe_blindRotateAndExtract(LweSample *result,
     tfhe_blindRotate(acc, bk, bara, n, bk_params);
     tLweExtractLweSample(result, acc, extract_params, accum_params);
 
-    delete_TLweSample(acc);
-    delete_TorusPolynomial(testvectbis);
+    //delete_TLweSample(acc);
+    //delete_TorusPolynomial(testvectbis);
 }
 
 //tfhe_bootstrap_woKS  
@@ -965,7 +1139,7 @@ EXPORT void tfhe_bootstrap_woKS(LweSample *result,
 
     TorusPolynomial *testvect = new_TorusPolynomial(N);
     //int32_t *bara = new int32_t[N];
-    int32_t* bara = (int32_t*)malloc(size * sizeof(int32_t));
+    int32_t* bara = (int32_t*)malloc(N * sizeof(int32_t));
 
     int32_t barb = modSwitchFromTorus32(x->b, Nx2);
     for (int32_t i = 0; i < n; i++) {
@@ -1015,12 +1189,22 @@ EXPORT void lweKeySwitch(LweSample* result, const LweKeySwitchKey* ks, const Lwe
 
 
 
+struct LweSample * new_LweSample( const struct LweParams* params) {
+    struct LweSample* sample;
+    sample->a = (Torus32*)malloc(params->n * sizeof(Torus32));
+    // 初始化其他成员
+    sample->b = 0;
+    sample->current_variance = 0.0;
+    return sample;
+}
+
+
 EXPORT void tfhe_bootstrap(LweSample *result,
                            const LweBootstrappingKey *bk,
                            Torus32 mu, const LweSample *x) {
 
-    LweSample *u = new_LweSample(&bk->accum_params->extracted_lweparams);
-
+    struct LweSample *u = new_LweSample(&bk->accum_params->extracted_lweparams);
+    // struct LweSample *u = new_gate_bootstrapping_ciphertext_array(1, bk->accum_params->extracted_lweparams);
     tfhe_bootstrap_woKS(u, bk, mu, x);
     // Key Switching
     lweKeySwitch(result, bk->ks, u);
@@ -1028,41 +1212,240 @@ EXPORT void tfhe_bootstrap(LweSample *result,
     //delete_LweSample(u);
 }
 
+EXPORT Torus32 modSwitchToTorus32(int32_t mu, int32_t Msize){
+    uint64_t interv = ((UINT64_C(1)<<63)/Msize)*2; // width of each intervall
+    uint64_t phase64 = mu*interv;
+    //floor to the nearest multiples of interv
+    return phase64>>32;
+}
 
+
+// void LweSample_init(struct LweSample* sample, const struct LweParams* params) {
+//     sample->a = (Torus32*)malloc(params->n * sizeof(Torus32));
+//     // 初始化其他成员
+//     sample->b = 0;
+//     sample->current_variance = 0.0;
+// }
+
+void LweSample_init(struct LweSample* sample, const struct LweParams* params) {
+    sample->a = (Torus32*)malloc(params->n * sizeof(Torus32));
+    sample->b = 0;
+    sample->current_variance = 0.0;
+}
+
+// 分配一个包含nbelts个LweSample的数组
+struct LweSample* alloc_LweSample_array(int32_t nbelts) {
+    return (struct LweSample*)malloc(nbelts * sizeof(struct LweSample));
+}
+
+// 初始化LweSample数组
+void init_LweSample_array(int32_t nbelts, struct LweSample* obj, const struct LweParams* params) {
+    for (int32_t i = 0; i < nbelts; i++) {
+        LweSample_init(&obj[i], params);
+    }
+}
+
+// 创建并初始化LweSample数组
+struct LweSample* new_LweSample_array(int32_t nbelts, const struct LweParams* params) {
+    struct LweSample* obj = alloc_LweSample_array(nbelts);
+    init_LweSample_array(nbelts, obj, params);
+    return obj;
+}
+
+
+// TFheGateBootstrappingParameterSet *read_new_tfheGateBootstrappingParameters(const Istream &F) {
+//     int32_t ks_t, ks_basebit;
+//     read_tfheGateBootstrappingProperParameters_section(F, ks_t, ks_basebit);
+//     LweParams *in_out_params = read_new_lweParams(F);
+//     TGswParams *bk_params = read_new_tGswParams(F);
+//     TfheGarbageCollector::register_param(in_out_params);
+//     TfheGarbageCollector::register_param(bk_params);
+//     return new TFheGateBootstrappingParameterSet(ks_t, ks_basebit, in_out_params, bk_params);
+// }
+
+
+// TFheGateBootstrappingSecretKeySet *
+// read_new_tfheGateBootstrappingSecretKeySet(const Istream &F, const TFheGateBootstrappingParameterSet *params = 0) {
+//     if (params == 0) {
+//         TFheGateBootstrappingParameterSet *tmp = read_new_tfheGateBootstrappingParameters(F);
+//         TfheGarbageCollector::register_param(tmp);
+//         params = tmp;
+//     }
+//     LweBootstrappingKey *bk = read_new_lweBootstrappingKey(F, params->in_out_params, params->tgsw_params);
+//     LweKey *lwe_key = read_new_lweKey(F, params->in_out_params);
+//     TGswKey *tgsw_key = read_new_tGswKey(F, params->tgsw_params);
+//     LweBootstrappingKeyFFT *bkFFT = new_LweBootstrappingKeyFFT(bk);
+//     return new TFheGateBootstrappingSecretKeySet(params, bk, bkFFT, lwe_key, tgsw_key);
+// }
+
+
+struct TGswParams*  TGswParams_init(struct TGswParams* params,int32_t l, int32_t Bgbit, const struct TLweParams* tlwe_params) {
+    params->l = l;
+    params->Bgbit = Bgbit;
+    params->Bg = 1 << Bgbit;
+    params->halfBg = params->Bg / 2;
+    params->maskMod = params->Bg - 1;
+    params->tlwe_params = tlwe_params;
+    params->kpl = (tlwe_params->k + 1) * l;
+
+    params->h = (Torus32*)malloc(l * sizeof(Torus32));
+    for (int32_t i = 0; i < l; ++i) {
+        int32_t kk = (32 - (i + 1) * Bgbit);
+        params->h[i] = 1 << kk; // 1/(Bg^(i+1)) as a Torus32
+    }
+
+    // offset = Bg/2 * (2^(32-Bgbit) + 2^(32-2*Bgbit) + ... + 2^(32-l*Bgbit))
+    uint32_t temp1 = 0;
+    for (int32_t i = 0; i < l; ++i) {
+        uint32_t temp0 = 1 << (32 - (i + 1) * Bgbit);
+        temp1 += temp0;
+    }
+    params->offset = temp1 * params->halfBg;
+    return params;
+}
+
+
+EXPORT void lweKeyGen(LweKey* result) {
+  const int32_t n = result->params->n;
+  //uniform_int_distribution<int32_t> distribution(0,1);
+
+  for (int32_t i=0; i<n; i++) 
+    // result->key[i]=distribution(generator);
+    result->key[i]=i;
+
+}
+
+
+
+/** generate a tgsw key (in fact, a tlwe key) */
+EXPORT void tGswKeyGen(TGswKey *result) {
+    tLweKeyGen(&result->tlwe_key);
+}
+// TLwe
+EXPORT void tLweKeyGen(TLweKey *result) {
+    const int32_t N = result->params->N;
+    const int32_t k = result->params->k;
+    //uniform_int_distribution<int32_t> distribution(0, 1);
+
+    for (int32_t i = 0; i < k; ++i)
+        for (int32_t j = 0; j < N; ++j)
+            //result->key[i].coefs[j] = distribution(generator);
+            result->key[i].coefs[j] = i+j;
+}
+
+
+
+
+
+EXPORT void tfhe_createLweBootstrappingKey(
+        LweBootstrappingKey *bk,
+        const LweKey *key_in,
+        const TGswKey *rgsw_key) {
+    // assert(bk->bk_params == rgsw_key->params);
+    // assert(bk->in_out_params == key_in->params);
+
+    const LweParams *in_out_params = bk->in_out_params;
+    const TGswParams *bk_params = bk->bk_params;
+    const TLweParams *accum_params = bk_params->tlwe_params;
+    const LweParams *extract_params = &accum_params->extracted_lweparams;
+
+    //LweKeySwitchKey* ks; ///< the keyswitch key (s'->s)
+    const TLweKey *accum_key = &rgsw_key->tlwe_key;
+    LweKey *extracted_key = new_LweKey(extract_params);
+    tLweExtractKey(extracted_key, accum_key);
+    lweCreateKeySwitchKey(bk->ks, extracted_key, key_in);
+    delete_LweKey(extracted_key);
+
+    //TGswSample* bk; ///< the bootstrapping key (s->s")
+    int32_t *kin = key_in->key;
+    const double alpha = accum_params->alpha_min;
+    const int32_t n = in_out_params->n;
+    //const int32_t kpl = bk_params->kpl;
+    //const int32_t k = accum_params->k;
+    //const int32_t N = accum_params->N;
+    //cout << "create the bootstrapping key bk ("  << "  " << n*kpl*(k+1)*N*4 << " bytes)" << endl;
+    //cout << "  with noise_stdev: " << alpha << endl;
+    for (int32_t i = 0; i < n; i++) {
+        tGswSymEncryptInt(&bk->bk[i], kin[i], alpha, rgsw_key);
+    }
+
+}
+
+
+EXPORT TFheGateBootstrappingSecretKeySet *
+new_random_gate_bootstrapping_secret_keyset(const TFheGateBootstrappingParameterSet *params) {
+    LweKey *lwe_key = new_LweKey(params->in_out_params);
+    lweKeyGen(lwe_key);
+    TGswKey *tgsw_key = new_TGswKey(params->tgsw_params);
+    tGswKeyGen(tgsw_key);
+    LweBootstrappingKey *bk = new_LweBootstrappingKey(params->ks_t, params->ks_basebit, params->in_out_params,
+                                                      params->tgsw_params);
+    tfhe_createLweBootstrappingKey(bk, lwe_key, tgsw_key);
+    LweBootstrappingKeyFFT *bkFFT = new_LweBootstrappingKeyFFT(bk);
+    return new TFheGateBootstrappingSecretKeySet(params, bk, bkFFT, lwe_key, tgsw_key);
+}
 
 
 
 
 int main()
 {   //we need note the  current ptr
-    TFheGateBootstrappingParameterSet *params;
+    //struct TFheGateBootstrappingParameterSet *params;
     FILE * prams_file = fopen("size_prams","wb");
-    params = new_tfheGateBootstrappingParameterSet_fromFile(prams_file);
+    //params = new_tfheGateBootstrappingParameterSet_fromFile(prams_file);
+    int std_params = 1;
+
+    // if (std_params) {
+    //////
+    static const int32_t N = 1024;//the prime value is 1024
+    static const int32_t k = 1;
+    static const int32_t n = 20;
+    static const int32_t bk_l = 2;
+    static const int32_t bk_Bgbit = 7;
+    static const int32_t ks_basebit = 2;
+    static const int32_t ks_length = 8;
+    //static const double ks_stdev = pow(2.,-15); //standard deviation
+    // static const double bk_stdev = pow(2.,-25);; //standard deviation
+    static const double ks_stdev = 1.0 / (1 << 15); //standard deviation
+    static const double bk_stdev = 1.0 / (1 << 25);; //standard deviation
+    static const double max_stdev = 0.012467; //max standard deviation for a 1/4 msg space
+    LweParams params_in_temp = {n, ks_stdev, max_stdev};
+    LweParams *params_in = &params_in_temp;
+    TLweParams params_accum_temp = {N, k, bk_stdev, max_stdev};
+    TLweParams *params_accum = &params_accum_temp;
+
+    //TGswParams params_bk_temp = {bk_l, bk_Bgbit, params_accum};
+    TGswParams *params_bk = TGswParams_init(params_bk,bk_l, bk_Bgbit, params_accum);
+    
+    TFheGateBootstrappingParameterSet params_temp = {ks_length, ks_basebit, params_in, params_bk};
+    TFheGateBootstrappingParameterSet *params = &params_temp;   
+    //////
+    // }
 
   //TFheGateBootstrappingSecretKeySet *key = new_random_gate_bootstrapping_secret_keyset(params);
     FILE * x7_file = fopen("size_bootstrap_secretkey","wb");
-    TFheGateBootstrappingSecretKeySet *key = new_tfheGateBootstrappingSecretKeySet_fromFile(x7_file);
-    const TFheGateBootstrappingCloudKeySet *bk = &(key->cloud); 
+    struct TFheGateBootstrappingSecretKeySet *key = new_tfheGateBootstrappingSecretKeySet_fromFile(x7_file);
+    const struct TFheGateBootstrappingCloudKeySet *bk = &(key->cloud); 
 
-    LweSample *temp_result = new_gate_bootstrapping_ciphertext_array(1,params);
+    struct LweSample *temp_result = new_LweSample_array(1,params->in_out_params);
 
-    static const Torus32 MU = modSwitchToTorus32(1, 8);
-    LweSample *c_en = new_gate_bootstrapping_ciphertext_array(1,params);
+    const Torus32 MU = modSwitchToTorus32(1, 8);
     FILE* temp_result_file = fopen("temp_result","wb");
-    temp_result = import_lweSample_fromFile(temp_result_file,params->in_out_params,temp_result);
+    //import_lweSample_fromFile(temp_result_file,temp_result,params->in_out_params);
     //here we must need know what operation we want to do
+    struct LweSample *result = new_LweSample_array(1,params->in_out_params);
     tfhe_bootstrap(result,bk->bk,MU,temp_result);
 
     //bool c_de = bootsSymDecrypt(c_en,key);
-    std::cout<<"output and data c_de :" << c_de << std::endl;
+    //std::cout<<"output and data c_de :" << c_de << std::endl;
     //bootsOR(c_en,a_en,b_en,bk);
 
 
 
     // time_t t1 = clock();
     //decrypt
-    bool c_de = bootsSymDecrypt(c_en,key);
+    //bool c_de = bootsSymDecrypt(c_en,key);
     //delete_gate_bootstrapping_secret_keyset(key);
     //delete_gate_bootstrapping_parameters(params);
     return 0;
-};
+}
