@@ -21,7 +21,7 @@ struct cplx {
 };
 
 
-#include <fftw3.h>
+//#include <fftw3.h>
 //#include "tfhe.h"
 //#include "polynomials.h"
 
@@ -88,8 +88,8 @@ struct LagrangeHalfCPolynomial_IMPL
 void plan_fftw(struct FFT_Processor_fftw* processor) {
     // Ensure FFTW plan thread safety
     static int initialized = 0;
-    static fftw_plan rev_p;
-    static fftw_plan p;
+    //static fftw_plan rev_p;
+    //static fftw_plan p;
     // static fftw_mutex_t mutex;
 
     // fftw_execute_with_flops(1); // ensure fftw is initialized (dummy fftw call)
