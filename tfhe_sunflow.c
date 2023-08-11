@@ -17,7 +17,7 @@
 //#include "tfhe_io.h"
 
 #define torusPolynomialMulR torusPolynomialMultFFT
-#define torusPolynomialAddMulR torusPolynomialAddMulRFFT
+// #define torusPolynomialAddMulR torusPolynomialAddMulRFFT
 #define torusPolynomialSubMulR torusPolynomialSubMulRFFT
 
 static const int64_t _two32 = INT64_C(1) << 32; // 2^32
@@ -25,7 +25,7 @@ static const int64_t _two32 = INT64_C(1) << 32; // 2^32
 
 
 
-
+static int mult_count = 0;
 
 
 
@@ -370,7 +370,7 @@ struct TFheGateBootstrappingCloudKeySet {
 
 #endif
 };
-struct TFheGateBootstrappingCloudKeySet * new_TFheGateBootstrappingCloudKeySet(const  *params,struct  LweBootstrappingKey *bk){
+struct TFheGateBootstrappingCloudKeySet * new_TFheGateBootstrappingCloudKeySet(const struct TFheGateBootstrappingParameterSet *params,struct  LweBootstrappingKey *bk){
     struct TFheGateBootstrappingCloudKeySet *result = (struct TFheGateBootstrappingCloudKeySet *) malloc(sizeof(struct TFheGateBootstrappingCloudKeySet));
     result->params = params;
     result->bk = bk;
@@ -544,7 +544,9 @@ EXPORT int32_t modSwitchFromTorus32(Torus32 phase1, int32_t Msize){
 
 EXPORT TorusPolynomial* new_TorusPolynomial(const int32_t N) {
     TorusPolynomial* tmp = (TorusPolynomial*) malloc(sizeof(TorusPolynomial));
-    TorusPolynomial_init(tmp,N);
+    tmp->N = N;
+    tmp->coefsT = (Torus32*) malloc(N*sizeof(Torus32));
+    // TorusPolynomial_init(tmp,N);
     return tmp;
 }
 
@@ -557,16 +559,19 @@ EXPORT TorusPolynomial* new_TorusPolynomial(const int32_t N) {
 //     return (TorusPolynomial*) malloc(nbelts*sizeof(TorusPolynomial));
 // }
 
-void init_TorusPolynomial_array(int32_t nbelts, struct TorusPolynomial* obj, const int32_t N) {
-    for (int32_t i = 0; i < nbelts; i++) {
-        TorusPolynomial_init(&obj[i], N);
-    }
-}
+// void init_TorusPolynomial_array(int32_t nbelts, struct TorusPolynomial* obj, const int32_t N) {
+//     for (int32_t i = 0; i < nbelts; i++) {
+//         TorusPolynomial_init(&obj[i], N);
+//     }
+// }
 
 
 EXPORT TorusPolynomial* new_TorusPolynomial_array(int32_t nbelts, const int32_t N) {
     TorusPolynomial* obj = (TorusPolynomial*) malloc(nbelts*sizeof(TorusPolynomial));
-    init_TorusPolynomial_array(nbelts,obj,N);
+    for (int32_t i = 0; i < nbelts; i++) {
+        TorusPolynomial_init(&obj[i], N);
+    }
+    // init_TorusPolynomial_array(nbelts,obj,N);
     return obj;
 }
 
@@ -576,8 +581,8 @@ EXPORT void init_LagrangeHalfCPolynomial_array(int32_t nbelts, LagrangeHalfCPoly
 	//  LagrangeHalfCPolynomial_IMPL_init(&(obj[i]),N);
     }
     }
-EXPORT LagrangeHalfCPolynomial* new_LagrangeHalfCPolynomial_array(int32_t nbelts, const int32_t N) {
-    LagrangeHalfCPolynomial* obj =(LagrangeHalfCPolynomial*) malloc(nbelts*sizeof(LagrangeHalfCPolynomial));
+EXPORT struct LagrangeHalfCPolynomial* new_LagrangeHalfCPolynomial_array(int32_t nbelts, const int32_t N) {
+    struct LagrangeHalfCPolynomial* obj =(struct LagrangeHalfCPolynomial*) malloc(nbelts*sizeof(struct LagrangeHalfCPolynomial));
     init_LagrangeHalfCPolynomial_array(nbelts,obj,N);
     return obj;
 }
@@ -610,7 +615,7 @@ struct TLweSampleFFT *new_TLweSampleFFT(const TLweParams* params) {
     return result;
 }
 struct TLweSampleFFT *new_TLweSampleFFT_array(int32_t nbelts, const struct TLweParams *params) {
-    struct TLweSampleFFT *obj = (struct TLweSample *)malloc(nbelts * sizeof(struct TLweSample));
+    struct TLweSampleFFT *obj = (struct TLweSampleFFT *)malloc(nbelts * sizeof(struct TLweSampleFFT));
     for (int32_t i = 0; i < nbelts; i++) {
         obj[i] = *new_TLweSampleFFT(params);
     }
@@ -746,19 +751,19 @@ EXPORT void torusPolynomialAddTo(TorusPolynomial *result, const TorusPolynomial 
 }
 
 
-EXPORT void torusPolynomialAddMulRFFT(TorusPolynomial* result, const IntPolynomial* poly1, const TorusPolynomial* poly2) {
-    return;
-    const int32_t N = poly1->N;
-    struct LagrangeHalfCPolynomial* tmp = new_LagrangeHalfCPolynomial_array(3,N);
-    struct TorusPolynomial* tmpr = new_TorusPolynomial(N);
-    IntPolynomial_ifft(tmp+0,poly1);
-    TorusPolynomial_ifft(tmp+1,poly2);
-    LagrangeHalfCPolynomialMul(tmp+2,tmp+0,tmp+1);
-    TorusPolynomial_fft(tmpr, tmp+2);
-    torusPolynomialAddTo(result, tmpr);
-    delete_TorusPolynomial(tmpr);
-    delete_LagrangeHalfCPolynomial_array(3,tmp);
-}
+// EXPORT void torusPolynomialAddMulRFFT(TorusPolynomial* result, const IntPolynomial* poly1, const TorusPolynomial* poly2) {
+//     return;
+//     const int32_t N = poly1->N;
+//     struct LagrangeHalfCPolynomial* tmp = new_LagrangeHalfCPolynomial_array(3,N);
+//     struct TorusPolynomial* tmpr = new_TorusPolynomial(N);
+//     IntPolynomial_ifft(tmp+0,poly1);
+//     TorusPolynomial_ifft(tmp+1,poly2);
+//     LagrangeHalfCPolynomialMul(tmp+2,tmp+0,tmp+1);
+//     TorusPolynomial_fft(tmpr, tmp+2);
+//     torusPolynomialAddTo(result, tmpr);
+//     delete_TorusPolynomial(tmpr);
+//     delete_LagrangeHalfCPolynomial_array(3,tmp);
+// }
 //tGswExternMulToTLwe
 
 EXPORT IntPolynomial* alloc_IntPolynomial_array(int32_t nbelts) {
@@ -952,6 +957,23 @@ EXPORT double intPolynomialNormSq2(const IntPolynomial *poly) {
     }
     return temp1;
 }
+
+
+void * torusPolynomialAddMulR(TorusPolynomial *result, const IntPolynomial *poly1,
+                                                const TorusPolynomial *poly2) {
+    extern int mult_count;
+    const int32_t N = poly1->N;
+    const int32_t *a = poly1->coefs;
+    const Torus32 *b = poly2->coefsT;
+    Torus32 *res = result->coefsT;
+
+    for (int32_t i = 0; i < N; ++i) {
+        res[i] += a[i] * b[i];
+        mult_count++;
+    }
+    //return result;
+}
+
 
 
 EXPORT void
@@ -1295,15 +1317,8 @@ struct LweSample * new_LweSample( const struct LweParams* params) {
 EXPORT void tfhe_bootstrap(LweSample *result,
                            const LweBootstrappingKey *bk,
                            Torus32 mu, const LweSample *x) {
-    // if(bk == NULL) printf("bk is NULL\n");
-    // else printf("bk is not NULL\n");
-    // if(bk->accum_params == NULL) printf("bk->accum_params is NULL\n");
-    // else printf("bk->accum_params is not NULL\n");
-    // if(bk->extract_params == NULL) printf("bk->extract_params is NULL\n");
-    // else printf("bk->extract_params is not NULL\n");
 
     struct LweSample *u = new_LweSample(&bk->accum_params->extracted_lweparams);
-    printf("doing bootstrap\n");
     // struct LweSample *u = new_gate_bootstrapping_ciphertext_array(1, bk->accum_params->extracted_lweparams);
     tfhe_bootstrap_woKS(u, bk, mu, x);
     // Key Switching
@@ -1379,7 +1394,8 @@ struct LweSample* new_LweSample_array(int32_t nbelts, const struct LweParams* pa
 // }
 
 
-struct TGswParams*  TGswParams_init(struct TGswParams* params,int32_t l, int32_t Bgbit, const struct TLweParams* tlwe_params) {
+struct TGswParams*  TGswParams_init(int32_t l, int32_t Bgbit, const struct TLweParams* tlwe_params) {
+    struct TGswParams* params = (struct TGswParams*)malloc(sizeof(struct TGswParams));
     params->l = l;
     params->Bgbit = Bgbit;
     params->Bg = 1 << Bgbit;
@@ -1406,14 +1422,12 @@ struct TGswParams*  TGswParams_init(struct TGswParams* params,int32_t l, int32_t
 
 
 EXPORT void lweKeyGen(LweKey* result) {
-    printf("here1\n");
+
 int32_t alpha = result->params->alpha_min;
-printf("here2\n");
     int32_t n = result->params->n;
     
     // int32_t n = 1024;
   //uniform_int_distribution<int32_t> distribution(0,1);
-    printf("here\n");
   for (int32_t i=0; i<n; i++) 
     // result->key[i]=distribution(generator);
     result->key[i]=i;
@@ -1423,14 +1437,13 @@ printf("here2\n");
 struct TLweKey * new_tlwe_key(const struct TLweParams *params) {
     struct TLweKey *obj = (struct TLweKey *) malloc(sizeof(struct TLweKey));
     obj->params = params;
-    obj->key = new_TorusPolynomial_array(params->k, params->N);
+    // obj->key = new_TorusPolynomial_array(params->k, params->N);
+    obj->key = new_IntPolynomial_array(params->k, params->N);
     return obj;
 }
 
-/** generate a tgsw key (in fact, a tlwe key) */
-EXPORT void tGswKeyGen(TGswKey *result) {
-    tLweKeyGen(&result->tlwe_key);
-}
+
+
 // TLwe
 EXPORT void tLweKeyGen(TLweKey *result) {
      int32_t N = result->params->N;
@@ -1442,6 +1455,14 @@ EXPORT void tLweKeyGen(TLweKey *result) {
             //result->key[i].coefs[j] = distribution(generator);
             result->key[i].coefs[j] = i+j;
 }
+
+
+EXPORT void tGswKeyGen(TGswKey *result) {
+    tLweKeyGen(&result->tlwe_key);
+}
+
+/** generate a tgsw key (in fact, a tlwe key) */
+
 
 
 struct LweKey* new_LweKey( const struct LweParams* params) {
@@ -1476,7 +1497,8 @@ struct TGswSample * new_TGswSample( const struct TGswParams *params) {
     const int32_t l = params->l;
 
     struct TLweSample *all_sample = new_TLweSample_array((k + 1) * l, params->tlwe_params);
-
+    if(all_sample == NULL)
+        printf("err!!!!  failed malloc all_sample~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
     struct TLweSample **bloc_sample = (struct TLweSample **)malloc((k + 1) * sizeof(struct TLweSample *));
     for (int32_t p = 0; p < k + 1; ++p) {
         bloc_sample[p] = all_sample + p * l;
@@ -1510,14 +1532,17 @@ struct TGswSampleFFT * new_TGswSampleFFT( const struct TGswParams *params) {
     return obj;
 }
 
+
+
 struct TGswSample *new_TGswSample_array(int32_t nbelts, const struct TGswParams *params) {
     struct TGswSample *obj = (struct TGswSample *)malloc(nbelts * sizeof(struct TGswSample));
+    printf("the size of array is %d\n",nbelts);
     for (int32_t i = 0; i < nbelts; i++) {
         obj[i] = *new_TGswSample(params);
     }
     return obj;
 }
-struct TGswSample *new_TGswSampleFFT_array(int32_t nbelts, const struct TGswParams *params) {
+struct TGswSampleFFT *new_TGswSampleFFT_array(int32_t nbelts, const struct TGswParams *params) {
     struct TGswSampleFFT *obj = (struct TGswSampleFFT *)malloc(nbelts * sizeof(struct TGswSampleFFT));
     for (int32_t i = 0; i < nbelts; i++) {
         obj[i] = *new_TGswSampleFFT(params);
@@ -1543,22 +1568,22 @@ EXPORT LweKeySwitchKey* alloc_LweKeySwitchKey() {
 }
 EXPORT LweKeySwitchKey* new_LweKeySwitchKey(int32_t n, int32_t t, int32_t basebit, const LweParams* out_params) {
     LweKeySwitchKey* obj = alloc_LweKeySwitchKey();
-    printf("success malloc lwekey\n");
+    // printf("success malloc lwekey\n");
     init_LweKeySwitchKey(obj, n,t,basebit,out_params);
-    if(obj->out_params == NULL)
-        printf("out_params is null\n");
-        else
-            printf("out_params is not null\n");
+    // if(obj->out_params == NULL)
+    //     // printf("out_params is null\n");
+    //     else
+            // printf("out_params is not null\n");
     return obj;
 }
 
 
 EXPORT void init_LweBootstrappingKey(LweBootstrappingKey *obj, int32_t ks_t, int32_t ks_basebit, const LweParams *in_out_params,
                                      const TGswParams *bk_params) {
-    const TLweParams *accum_params = bk_params->tlwe_params;
-    const LweParams *extract_params = &accum_params->extracted_lweparams;
-    const int32_t n = in_out_params->n;
-    const int32_t N = extract_params->n;
+     TLweParams *accum_params = bk_params->tlwe_params;
+     LweParams *extract_params = &accum_params->extracted_lweparams;
+     int32_t n = in_out_params->n;
+     int32_t N = extract_params->n;
 
     TGswSample *bk = new_TGswSample_array(n, bk_params);
     LweKeySwitchKey *ks = new_LweKeySwitchKey(N, ks_t, ks_basebit, in_out_params);
@@ -1581,14 +1606,14 @@ new_LweBootstrappingKey(const int32_t ks_t, const int32_t ks_basebit, const LweP
                         const TGswParams *bk_params) {
     LweBootstrappingKey *obj = alloc_LweBootstrappingKey();
     init_LweBootstrappingKey(obj, ks_t, ks_basebit, in_out_params, bk_params);
-    if(obj->accum_params == NULL)
-        printf("accum_params is null\n");
-        else
-            printf("accum_params is not null\n");
-    if(obj->extract_params == NULL)
-        printf("extract_params is null\n");
-        else
-            printf("extract_params is not null\n");
+    // if(obj->accum_params == NULL)
+    //     printf("accum_params is null\n");
+    //     else
+    //         printf("accum_params is not null\n");
+    // if(obj->extract_params == NULL)
+    //     printf("extract_params is null\n");
+    //     else
+    //         printf("extract_params is not null\n");
     return obj;
 }
 
@@ -1710,6 +1735,23 @@ EXPORT void torusPolynomialUniform(TorusPolynomial *result) {
 // }
 
 EXPORT void tLweSymEncryptZero(TLweSample *result, double alpha, const TLweKey *key) {
+    // if(key->params == NULL)
+    //     printf("key->params is NULL\n");
+    //     else
+    //         printf("key->params is not NULL\n");
+    // if(key->key == NULL)
+    //     printf("key->key is NULL\n");
+    //     else
+    //         printf("key->key is not NULL\n");
+
+    // if(result->a == NULL)
+    //     printf("result->a is NULL\n");
+    //     else
+    //         printf("result->a is not NULL\n");
+    // if(result->b == NULL)
+    //     printf("result->b is NULL\n");
+    //     else
+    //         printf("result->b is not NULL\n");
     const int32_t N = key->params->N;
     const int32_t k = key->params->k;
 
@@ -1768,7 +1810,6 @@ EXPORT void tfhe_createLweBootstrappingKey(
     tLweExtractKey(extracted_key, accum_key);
     lweCreateKeySwitchKey(bk->ks, extracted_key, key_in);
     //delete_LweKey(extracted_key);
-
     //TGswSample* bk; ///< the bootstrapping key (s->s")
     int32_t *kin = key_in->key;
     const double alpha = accum_params->alpha_min;
@@ -1782,8 +1823,9 @@ EXPORT void tfhe_createLweBootstrappingKey(
         tGswSymEncryptInt(&bk->bk[i], kin[i], alpha, rgsw_key);
     }
 
+
 }
-LweBootstrappingKeyFFT* new_LweBootstrappingKeyFFT(TFheGateBootstrappingParameterSet *params){
+LweBootstrappingKeyFFT* new_LweBootstrappingKeyFFT(const struct TFheGateBootstrappingParameterSet *params){
     LweBootstrappingKeyFFT* ptr = (LweBootstrappingKeyFFT*) malloc(sizeof(LweBootstrappingKeyFFT));
     ptr->accum_params = params->tgsw_params->tlwe_params;
     ptr->extract_params = &params->tgsw_params->tlwe_params->extracted_lweparams;
@@ -1802,23 +1844,18 @@ EXPORT TFheGateBootstrappingSecretKeySet *
 new_random_gate_bootstrapping_secret_keyset(const TFheGateBootstrappingParameterSet *params) {
     TFheGateBootstrappingSecretKeySet *obj = (TFheGateBootstrappingSecretKeySet *) malloc(
             sizeof(TFheGateBootstrappingSecretKeySet));
-    printf("0\n");
+
     LweKey *lwe_key = new_LweKey(params->in_out_params);
-    printf("1\n");
     lweKeyGen(lwe_key);
-    printf("1.5\n");
     TGswKey *tgsw_key = new_TGswKey(params->tgsw_params);
-    printf("2\n");
     tGswKeyGen(tgsw_key);
     LweBootstrappingKey *bk = new_LweBootstrappingKey(params->ks_t, params->ks_basebit, params->in_out_params,
                                                       params->tgsw_params);
-    printf("3\n");
     tfhe_createLweBootstrappingKey(bk, lwe_key, tgsw_key);
-    LweBootstrappingKeyFFT *bkFFT  = new_LweBootstrappingKeyFFT;
+    LweBootstrappingKeyFFT *bkFFT  = new_LweBootstrappingKeyFFT(params);
     // = new_LweBootstrappingKeyFFT(bk);
     //return new TFheGateBootstrappingSecretKeySet(params, bk, bkFFT, lwe_key, tgsw_key);
-    printf("4\n");
-
+    // printf("4\n");
     obj->params = params;
     obj->lwe_key = lwe_key; 
     obj->tgsw_key = tgsw_key;   
@@ -1834,17 +1871,16 @@ new_random_gate_bootstrapping_secret_keyset(const TFheGateBootstrappingParameter
 int main()
 {   //we need note the  current ptr
     //struct TFheGateBootstrappingParameterSet *params;
-    printf("hello world\n");
-    printf("executing the main function\n");
-    FILE * prams_file = fopen("size_prams","wb");
+    printf("executing the main function~~\n");
+    // FILE * prams_file = fopen("size_prams","wb");
     //params = new_tfheGateBootstrappingParameterSet_fromFile(prams_file);
-    int std_params = 1;
+    // int std_params = 1;
 
     // if (std_params) {
     //////
     static const int32_t N = 1024;//the prime value is 1024
     static const int32_t k = 1;
-    static const int32_t n = 20;
+    static const int32_t n = 200;
     static const int32_t bk_l = 2;
     static const int32_t bk_Bgbit = 7;
     static const int32_t ks_basebit = 2;
@@ -1860,15 +1896,19 @@ int main()
     TLweParams *params_accum = &params_accum_temp;
 
     //TGswParams params_bk_temp = {bk_l, bk_Bgbit, params_accum};
-    TGswParams *params_bk = TGswParams_init(params_bk,bk_l, bk_Bgbit, params_accum);
+    TGswParams *params_bk = TGswParams_init(bk_l, bk_Bgbit, params_accum);
     
     TFheGateBootstrappingParameterSet params_temp = {ks_length, ks_basebit, params_in, params_bk};
     TFheGateBootstrappingParameterSet *params = &params_temp;   
+
+
+    printf("the N is : %d , and the n is : %d\n ",N,n);
+    printf("the product of N * n = : %d\n",N * n);
     //////
     // }
-    printf("hello world\n");
+   //printf("hello world\n");
   //TFheGateBootstrappingSecretKeySet *key = new_random_gate_bootstrapping_secret_keyset(params);
-    FILE * x7_file = fopen("size_bootstrap_secretkey","wb");
+    //FILE * x7_file = fopen("size_bootstrap_secretkey","wb");
     //struct TFheGateBootstrappingSecretKeySet *key = new_tfheGateBootstrappingSecretKeySet_fromFile(x7_file);
 
     uint32_t seed[] = {214, 1592, 657};
@@ -1886,14 +1926,12 @@ int main()
     //import_lweSample_fromFile(temp_result_file,temp_result,params->in_out_params);
     //here we must need know what operation we want to do
     struct LweSample *result = new_LweSample_array(1,params->in_out_params);
-    printf("executring the bootstrap function,successfully generate result \n");
-        if(bk->bk == NULL) printf("bk is123123123 NULL\n");
-    else printf("bk is not1231231 NULL\n");
-    if(bk->bk->accum_params == NULL) printf("bk->accum_123123params is NULL\n");
-    else printf("bk->accum_123123params is not NULL\n");
+    printf("executing the bootstrap function\n");
     tfhe_bootstrap(result,bk->bk,MU,temp_result);
     printf("bootsrapping is done !! \n");
 
+    printf("the mul conut is %d\n",mult_count);
+    printf("the rate of mul is %f\n",mult_count / (N * n * 1.0));
     //bool c_de = bootsSymDecrypt(c_en,key);
     //std::cout<<"output and data c_de :" << c_de << std::endl;
     //bootsOR(c_en,a_en,b_en,bk);

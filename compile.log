@@ -1,0 +1,40 @@
+executing the main function~~
+generate the thfeGateBootstrappingSecretKeySet
+the size of array is 30
+executring the bootstrap function,successfully generate key 
+executing the bootstrap function
+bootsrapping is done !! 
+the N is : 1024 , and the n is : 30
+ the product of N * n = : 30720
+the mul conut is 122880
+the rate of mul is 4.000000
+executing the main function~~
+generate the thfeGateBootstrappingSecretKeySet
+the size of array is 50
+executring the bootstrap function,successfully generate key 
+executing the bootstrap function
+bootsrapping is done !! 
+the N is : 1024 , and the n is : 50
+ the product of N * n = : 51200
+the mul conut is 204800
+the rate of mul is 4.000000
+executing the main function~~
+generate the thfeGateBootstrappingSecretKeySet
+the size of array is 50
+executring the bootstrap function,successfully generate key 
+executing the bootstrap function
+bootsrapping is done !! 
+the N is : 1024 , and the n is : 50
+ the product of N * n = : 51200
+the mul conut is 204800
+the rate of mul is 4.000000
+executing the main function~~
+generate the thfeGateBootstrappingSecretKeySet
+the size of array is 50
+executring the bootstrap function,successfully generate key 
+executing the bootstrap function
+bootsrapping is done !! 
+the N is : 1024 , and the n is : 50
+ the product of N * n = : 51200
+the mul conut is 204800
+the rate of mul is 4.000000
