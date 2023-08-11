@@ -38,3 +38,26 @@ the N is : 1024 , and the n is : 50
  the product of N * n = : 51200
 the mul conut is 204800
 the rate of mul is 4.000000
+executing the main function~~
+the N is : 1024 , and the n is : 630
+ the product of N * n = : 645120
+generate the thfeGateBootstrappingSecretKeySet
+the size of array is 630
+executring the bootstrap function,successfully generate key 
+executing the bootstrap function
+bootsrapping is done !! 
+the mul conut is 2580480
+the rate of mul is 4.000000
+executing the main function~~
+the N is : 1024 , and the n is : 630
+ the product of N * n = : 645120
+the value of in_out_params->n is : 630
+generate the thfeGateBootstrappingSecretKeySet
+success malloc tgswSample array
+init the bk successfully
+executring the bootstrap function,successfully generate key 
+executing the bootstrap function
+bootsrapping is done !! 
+the mul conut is 2580480
+the rate of mul is 4.000000
+
