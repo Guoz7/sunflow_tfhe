@@ -11,4 +11,4 @@ fi
 gcc $flag  tfhe_sunflow.c  
 ./a.out
 
-
+####################
