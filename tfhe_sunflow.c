@@ -7,6 +7,9 @@
 #define n_value 630
 
 
+#define INT64_C(c) (c ## LL)
+#define UINT64_C(c) (c ## ULL)
+
 //#include "lagrangehalfc_impl.h"
 /*
 #include "ni.h"
@@ -14,16 +17,17 @@
 #include "sdram.h"
 */
 
-#define INT64_C(c)  c ## LL
+// #define INT64_C(c)  c ## LL
 typedef int32_t Torus32; //avant uint32_t
 typedef unsigned int		uint32_t;
+typedef unsigned long long uint64_t;
 //#include "tfhe_io.h"
 
 #define torusPolynomialMulR torusPolynomialMultFFT
 // #define torusPolynomialAddMulR torusPolynomialAddMulRFFT
 #define torusPolynomialSubMulR torusPolynomialSubMulRFFT
 
-static const int64_t _two32 = INT64_C(1) << 32; // 2^32
+static const long _two32 = INT64_C(1) << 32; // 2^32
 
 
 
@@ -473,12 +477,12 @@ void TorusPolynomial_destroy(struct TorusPolynomial* poly) {
 
 
 //#include "tfhe.h"
-#include "tfhe_io.h"
+//#include "tfhe_io.h"
 
 
 //  wle functionfnew_TorusPolynomial_array
 
-EXPORT void lweNoiselessTrivial(LweSample* result, Torus32 mu, const LweParams* params){
+  void lweNoiselessTrivial(LweSample* result, Torus32 mu, const LweParams* params){
     // printf("2.1\n");
     const int32_t n = params->n;
     // printf("2.5\n");
@@ -489,7 +493,7 @@ EXPORT void lweNoiselessTrivial(LweSample* result, Torus32 mu, const LweParams* 
 
 
 /** result = result - sample */
-EXPORT void lweSubTo(LweSample* result, const LweSample* sample, const LweParams* params){
+  void lweSubTo(LweSample* result, const LweSample* sample, const LweParams* params){
     const int32_t n = params->n;
     const Torus32* __restrict sa = sample->a;
     Torus32* __restrict ra = result->a;
@@ -505,7 +509,7 @@ EXPORT void lweSubTo(LweSample* result, const LweSample* sample, const LweParams
 
 
 
-EXPORT void lweAddTo(LweSample* result, const LweSample* sample, const LweParams* params){
+  void lweAddTo(LweSample* result, const LweSample* sample, const LweParams* params){
     const int32_t n = params->n;
 
     for (int32_t i = 0; i < n; ++i) result->a[i] += sample->a[i];
@@ -518,7 +522,7 @@ EXPORT void lweAddTo(LweSample* result, const LweSample* sample, const LweParams
 
 
 
-EXPORT int32_t modSwitchFromTorus32(Torus32 phase1, int32_t Msize){
+int32_t modSwitchFromTorus32(Torus32 phase1, int32_t Msize){
     uint64_t interv = ((UINT64_C(1)<<63)/Msize)*2; // width of each intervall
     uint64_t half_interval = interv/2; // begin of the first intervall
     uint64_t phase64 = (uint64_t)phase1;
@@ -529,7 +533,7 @@ EXPORT int32_t modSwitchFromTorus32(Torus32 phase1, int32_t Msize){
 }
 
 
-EXPORT TorusPolynomial* new_TorusPolynomial(const int32_t N) {
+  TorusPolynomial* new_TorusPolynomial(const int32_t N) {
     TorusPolynomial* tmp = (TorusPolynomial*) malloc(sizeof(TorusPolynomial));
     tmp->N = N;
     tmp->coefsT = (Torus32*) malloc(N*sizeof(Torus32));
@@ -542,7 +546,7 @@ EXPORT TorusPolynomial* new_TorusPolynomial(const int32_t N) {
 //     this->coefsT = new Torus32[N]; 
 // }
 
-// EXPORT TorusPolynomial* alloc_TorusPolynomial_array(int32_t nbelts) {
+//   TorusPolynomial* alloc_TorusPolynomial_array(int32_t nbelts) {
 //     return (TorusPolynomial*) malloc(nbelts*sizeof(TorusPolynomial));
 // }
 
@@ -553,7 +557,7 @@ EXPORT TorusPolynomial* new_TorusPolynomial(const int32_t N) {
 // }
 
 
-EXPORT TorusPolynomial* new_TorusPolynomial_array(int32_t nbelts, const int32_t N) {
+  TorusPolynomial* new_TorusPolynomial_array(int32_t nbelts, const int32_t N) {
     TorusPolynomial* obj = (TorusPolynomial*) malloc(nbelts*sizeof(TorusPolynomial));
        if(obj == NULL) 
         printf("error !!!!failed malloc a TorusPolynomial array\n "); 
@@ -565,12 +569,12 @@ EXPORT TorusPolynomial* new_TorusPolynomial_array(int32_t nbelts, const int32_t 
 }
 
 
-EXPORT void init_LagrangeHalfCPolynomial_array(int32_t nbelts, LagrangeHalfCPolynomial* obj, const int32_t N) {
+  void init_LagrangeHalfCPolynomial_array(int32_t nbelts, LagrangeHalfCPolynomial* obj, const int32_t N) {
     for (int32_t i=0; i<nbelts; i++) {
 	//  LagrangeHalfCPolynomial_IMPL_init(&(obj[i]),N);
     }
     }
-EXPORT struct LagrangeHalfCPolynomial* new_LagrangeHalfCPolynomial_array(int32_t nbelts, const int32_t N) {
+  struct LagrangeHalfCPolynomial* new_LagrangeHalfCPolynomial_array(int32_t nbelts, const int32_t N) {
     struct LagrangeHalfCPolynomial* obj =(struct LagrangeHalfCPolynomial*) malloc(nbelts*sizeof(struct LagrangeHalfCPolynomial));
     init_LagrangeHalfCPolynomial_array(nbelts,obj,N);
     return obj;
@@ -612,22 +616,22 @@ struct TLweSample *new_TLweSample_array(int32_t nbelts, const struct TLweParams 
 // }
 
 // TorusPolynomial = 0
-EXPORT void torusPolynomialClear(TorusPolynomial *result) {
+  void torusPolynomialClear(TorusPolynomial *result) {
     const int32_t N = result->N;
 
     for (int32_t i = 0; i < N; ++i) result->coefsT[i] = 0;
 }
 
-// EXPORT void tfhe_blindRotate(TLweSample* accum, const TGswSample* bk, const int32_t* bara, const int32_t n, const TGswParams* bk_params);
-// EXPORT void tfhe_blindRotateAndExtract(LweSample* result, const TorusPolynomial* v, const TGswSample* bk, const int32_t barb, const int32_t* bara, const int32_t n, const TGswParams* bk_params);
-// EXPORT void tfhe_bootstrap_woKS(LweSample* result, const LweBootstrappingKey* bk, Torus32 mu, const LweSample* x);
-// EXPORT void tfhe_bootstrap(LweSample* result, const LweBootstrappingKey* bk, Torus32 mu, const LweSample* x);
-// EXPORT void tfhe_createLweBootstrappingKey(LweBootstrappingKey* bk, const LweKey* key_in, const TGswKey* rgsw_key);
+//   void tfhe_blindRotate(TLweSample* accum, const TGswSample* bk, const int32_t* bara, const int32_t n, const TGswParams* bk_params);
+//   void tfhe_blindRotateAndExtract(LweSample* result, const TorusPolynomial* v, const TGswSample* bk, const int32_t barb, const int32_t* bara, const int32_t n, const TGswParams* bk_params);
+//   void tfhe_bootstrap_woKS(LweSample* result, const LweBootstrappingKey* bk, Torus32 mu, const LweSample* x);
+//   void tfhe_bootstrap(LweSample* result, const LweBootstrappingKey* bk, Torus32 mu, const LweSample* x);
+//   void tfhe_createLweBootstrappingKey(LweBootstrappingKey* bk, const LweKey* key_in, const TGswKey* rgsw_key);
 
 
 
 
-EXPORT void die_dramatically(const char* message);
+  void die_dramatically(const char* message);
 
 // // //torusPolynomialAddMulRFFT
 // class FFT_Processor_fftw {
@@ -692,15 +696,15 @@ EXPORT void die_dramatically(const char* message);
 
 
 
-// EXPORT void IntPolynomial_ifft(LagrangeHalfCPolynomial* result, const IntPolynomial* p) {
+//   void IntPolynomial_ifft(LagrangeHalfCPolynomial* result, const IntPolynomial* p) {
 //     fp1024_fftw.execute_reverse_int = execute_reverse_int;
 //     fp1024_fftw.execute_reverse_int(((struct LagrangeHalfCPolynomial_IMPL*)result)->coefsC, p->coefs);
 // }
-// EXPORT void TorusPolynomial_ifft(LagrangeHalfCPolynomial* result, const TorusPolynomial* p) {
+//   void TorusPolynomial_ifft(LagrangeHalfCPolynomial* result, const TorusPolynomial* p) {
 //     fp1024_fftw.execute_reverse_torus32 = execute_reverse_torus32;  
 //     fp1024_fftw.execute_reverse_torus32(((struct LagrangeHalfCPolynomial_IMPL*)result)->coefsC, p->coefsT);
 // }
-// EXPORT void TorusPolynomial_fft(TorusPolynomial* result, const LagrangeHalfCPolynomial* p) {
+//   void TorusPolynomial_fft(TorusPolynomial* result, const LagrangeHalfCPolynomial* p) {
 //     fp1024_fftw.execute_direct_Torus32 = execute_direct_Torus32;
 //     fp1024_fftw.execute_direct_Torus32(result->coefsT, ((struct LagrangeHalfCPolynomial_IMPL*)p)->coefsC);
 // }
@@ -730,7 +734,7 @@ EXPORT void die_dramatically(const char* message);
 
 
 // TorusPolynomial += TorusPolynomial
-EXPORT void torusPolynomialAddTo(TorusPolynomial *result, const TorusPolynomial *poly2) {
+  void torusPolynomialAddTo(TorusPolynomial *result, const TorusPolynomial *poly2) {
     const int32_t N = poly2->N;
     Torus32 *r = result->coefsT;
     const Torus32 *b = poly2->coefsT;
@@ -740,7 +744,7 @@ EXPORT void torusPolynomialAddTo(TorusPolynomial *result, const TorusPolynomial 
 }
 
 
-// EXPORT void torusPolynomialAddMulRFFT(TorusPolynomial* result, const IntPolynomial* poly1, const TorusPolynomial* poly2) {
+//   void torusPolynomialAddMulRFFT(TorusPolynomial* result, const IntPolynomial* poly1, const TorusPolynomial* poly2) {
 //     return;
 //     const int32_t N = poly1->N;
 //     struct LagrangeHalfCPolynomial* tmp = new_LagrangeHalfCPolynomial_array(3,N);
@@ -755,7 +759,7 @@ EXPORT void torusPolynomialAddTo(TorusPolynomial *result, const TorusPolynomial 
 // }
 //tGswExternMulToTLwe
 
-EXPORT IntPolynomial* alloc_IntPolynomial_array(int32_t nbelts) {
+  IntPolynomial* alloc_IntPolynomial_array(int32_t nbelts) {
     return (IntPolynomial*) malloc(nbelts*sizeof(IntPolynomial));
 }
 
@@ -764,7 +768,7 @@ EXPORT IntPolynomial* alloc_IntPolynomial_array(int32_t nbelts) {
 //     this->coefs = new int32_t[N]; 
 // }
 
-// EXPORT void init_IntPolynomial_array(int32_t nbelts, IntPolynomial* obj, const int32_t N) {
+//   void init_IntPolynomial_array(int32_t nbelts, IntPolynomial* obj, const int32_t N) {
 //     for (int32_t i=0; i<nbelts; i++) {
 // 	new(obj+i) IntPolynomial(N);
 //     }
@@ -786,7 +790,7 @@ void init_IntPolynomial_array(int32_t nbelts, struct IntPolynomial* obj, const i
     }
 }
 
-EXPORT IntPolynomial* new_IntPolynomial_array(int32_t nbelts, const int32_t N) {
+  IntPolynomial* new_IntPolynomial_array(int32_t nbelts, const int32_t N) {
     IntPolynomial* obj = alloc_IntPolynomial_array(nbelts);
     init_IntPolynomial_array(nbelts,obj,N);
     return obj;
@@ -799,7 +803,7 @@ EXPORT IntPolynomial* new_IntPolynomial_array(int32_t nbelts, const int32_t N) {
 
 #if defined INCLUDE_ALL || defined INCLUDE_TGSW_TORUS32POLYNOMIAL_DECOMP_H
 #undef INCLUDE_TGSW_TORUS32POLYNOMIAL_DECOMP_H
-EXPORT void
+  void
 tGswTorus32PolynomialDecompH(IntPolynomial *result, const TorusPolynomial *sample, const TGswParams *params) {
     const int32_t N = params->tlwe_params->N;
     const int32_t l = params->l;
@@ -914,7 +918,7 @@ tGswTorus32PolynomialDecompH(IntPolynomial *result, const TorusPolynomial *sampl
 }
 #endif
 
-EXPORT void tGswTLweDecompH(IntPolynomial *result, const TLweSample *sample, const TGswParams *params) {
+  void tGswTLweDecompH(IntPolynomial *result, const TLweSample *sample, const TGswParams *params) {
     const int32_t k = params->tlwe_params->k;
     const int32_t l = params->l;
 
@@ -924,7 +928,7 @@ EXPORT void tGswTLweDecompH(IntPolynomial *result, const TLweSample *sample, con
 
 //Arithmetic operations on TLwe samples
 /** result = (0,0) */
-EXPORT void tLweClear(TLweSample *result, const TLweParams *params) {
+  void tLweClear(TLweSample *result, const TLweParams *params) {
     const int32_t k = params->k;
 
     for (int32_t i = 0; i < k; ++i) torusPolynomialClear(&result->a[i]);
@@ -936,7 +940,7 @@ EXPORT void tLweClear(TLweSample *result, const TLweParams *params) {
 
 
 // Norme Euclidienne d'un IntPolynomial
-EXPORT double intPolynomialNormSq2(const IntPolynomial *poly) {
+  double intPolynomialNormSq2(const IntPolynomial *poly) {
     const int32_t N = poly->N;
     int32_t temp1 = 0;
 
@@ -965,7 +969,7 @@ void * torusPolynomialAddMulR(TorusPolynomial *result, const IntPolynomial *poly
 
 
 
-EXPORT void
+  void
 tLweAddMulRTo(TLweSample *result, const IntPolynomial *p, const TLweSample *sample, const TLweParams *params) {
     const int32_t k = params->k;
 
@@ -974,7 +978,7 @@ tLweAddMulRTo(TLweSample *result, const IntPolynomial *p, const TLweSample *samp
     result->current_variance += intPolynomialNormSq2(p) * sample->current_variance;
 }
 
-EXPORT void tGswExternMulToTLwe(TLweSample *accum, const TGswSample *sample, const TGswParams *params) {
+  void tGswExternMulToTLwe(TLweSample *accum, const TGswSample *sample, const TGswParams *params) {
     const TLweParams *par = params->tlwe_params;
     const int32_t N = par->N;
     const int32_t kpl = params->kpl;
@@ -995,7 +999,7 @@ EXPORT void tGswExternMulToTLwe(TLweSample *accum, const TGswSample *sample, con
 //tfhe_MuxRotate
 
 //result= (X^{a}-1)*source
-EXPORT void torusPolynomialMulByXaiMinusOne(TorusPolynomial *result, int32_t a, const TorusPolynomial *source) {
+  void torusPolynomialMulByXaiMinusOne(TorusPolynomial *result, int32_t a, const TorusPolynomial *source) {
     const int32_t N = source->N;
     Torus32 *out = result->coefsT;
     Torus32 *in = source->coefsT;
@@ -1017,19 +1021,19 @@ EXPORT void torusPolynomialMulByXaiMinusOne(TorusPolynomial *result, int32_t a, 
 }
 
 //mult externe de X^ai-1 par bki
-EXPORT void tLweMulByXaiMinusOne(TLweSample *result, int32_t ai, const TLweSample *bk, const TLweParams *params) {
+  void tLweMulByXaiMinusOne(TLweSample *result, int32_t ai, const TLweSample *bk, const TLweParams *params) {
     const int32_t k = params->k;
     for (int32_t i = 0; i <= k; i++)
         torusPolynomialMulByXaiMinusOne(&result->a[i], ai, &bk->a[i]);
 }
 
-EXPORT void tLweAddTTo(TLweSample *result, const int32_t pos, const Torus32 x, const TLweParams *params) {
+  void tLweAddTTo(TLweSample *result, const int32_t pos, const Torus32 x, const TLweParams *params) {
     result->a[pos].coefsT[0] += x;
 }
 
 
 
-EXPORT void tLweAddTo(TLweSample *result, const TLweSample *sample, const TLweParams *params) {
+  void tLweAddTo(TLweSample *result, const TLweSample *sample, const TLweParams *params) {
     const int32_t k = params->k;
 
     for (int32_t i = 0; i < k; ++i)
@@ -1056,7 +1060,7 @@ void tfhe_MuxRotate(TLweSample *result, const TLweSample *accum, const TGswSampl
 
 //tfhe_blindRotate
 /** result = sample */
-EXPORT void tLweCopy(TLweSample *result, const TLweSample *sample, const TLweParams *params) {
+  void tLweCopy(TLweSample *result, const TLweSample *sample, const TLweParams *params) {
     const int32_t k = params->k;
     const int32_t N = params->N;
 
@@ -1069,7 +1073,7 @@ EXPORT void tLweCopy(TLweSample *result, const TLweSample *sample, const TLwePar
 
 
 
-EXPORT void
+  void
 tfhe_blindRotate(TLweSample *accum, const TGswSample *bk, const int32_t *bara, const int32_t n, const TGswParams *bk_params) {
 
     //TGswSample* temp = new_TGswSample(bk_params);
@@ -1106,7 +1110,7 @@ tfhe_blindRotate(TLweSample *accum, const TGswSample *bk, const int32_t *bara, c
 
 
 //result= X^{a}*source
-EXPORT void torusPolynomialMulByXai(TorusPolynomial *result, int32_t a, const TorusPolynomial *source) {
+  void torusPolynomialMulByXai(TorusPolynomial *result, int32_t a, const TorusPolynomial *source) {
     const int32_t N = source->N;
     Torus32 *out = result->coefsT;
     Torus32 *in = source->coefsT;
@@ -1129,7 +1133,7 @@ EXPORT void torusPolynomialMulByXai(TorusPolynomial *result, int32_t a, const To
 }
 
 
-EXPORT void torusPolynomialCopy(
+  void torusPolynomialCopy(
         TorusPolynomial *result,
         const TorusPolynomial *sample) {
     //assert(result != sample);
@@ -1141,7 +1145,7 @@ EXPORT void torusPolynomialCopy(
 }
 
 /** result = (0,mu) */
-EXPORT void tLweNoiselessTrivial(TLweSample *result, const TorusPolynomial *mu, const TLweParams *params) {
+  void tLweNoiselessTrivial(TLweSample *result, const TorusPolynomial *mu, const TLweParams *params) {
     const int32_t k = params->k;
 
     for (int32_t i = 0; i < k; ++i) torusPolynomialClear(&result->a[i]);
@@ -1150,7 +1154,7 @@ EXPORT void tLweNoiselessTrivial(TLweSample *result, const TorusPolynomial *mu, 
 }
 
 
-EXPORT void tLweExtractLweSampleIndex(LweSample* result, const TLweSample* x, const int32_t index, const LweParams* params,  const TLweParams* rparams) {
+  void tLweExtractLweSampleIndex(LweSample* result, const TLweSample* x, const int32_t index, const LweParams* params,  const TLweParams* rparams) {
     const int32_t N = rparams->N;
     const int32_t k = rparams->k;
     //assert(params->n == k*N);
@@ -1165,11 +1169,11 @@ EXPORT void tLweExtractLweSampleIndex(LweSample* result, const TLweSample* x, co
 }
 
 
-EXPORT void tLweExtractLweSample(LweSample* result, const TLweSample* x, const LweParams* params,  const TLweParams* rparams) {
+  void tLweExtractLweSample(LweSample* result, const TLweSample* x, const LweParams* params,  const TLweParams* rparams) {
     tLweExtractLweSampleIndex(result, x, 0, params, rparams);
 }
 
-// EXPORT TorusPolynomial* alloc_TorusPolynomial_array(int32_t nbelts) {
+//   TorusPolynomial* alloc_TorusPolynomial_array(int32_t nbelts) {
 //     return (TorusPolynomial*) malloc(nbelts*sizeof(TorusPolynomial));
 // }
 
@@ -1178,7 +1182,7 @@ EXPORT void tLweExtractLweSample(LweSample* result, const TLweSample* x, const L
 //     this->coefsT = new Torus32[N]; 
 // }
 
-// EXPORT void init_TorusPolynomial_array(int32_t nbelts, TorusPolynomial* obj, const int32_t N) {
+//   void init_TorusPolynomial_array(int32_t nbelts, TorusPolynomial* obj, const int32_t N) {
 //     for (int32_t i=0; i<nbelts; i++) {
 // 	new(obj+i) TorusPolynomial(N);
 //     }
@@ -1192,7 +1196,7 @@ EXPORT void tLweExtractLweSample(LweSample* result, const TLweSample* x, const L
 
 
 
-// EXPORT TorusPolynomial* new_TorusPolynomial_array(int32_t nbelts, const int32_t N) {
+//   TorusPolynomial* new_TorusPolynomial_array(int32_t nbelts, const int32_t N) {
 //     TorusPolynomial* obj = alloc_TorusPolynomial_array(nbelts);
 //     init_TorusPolynomial_array(nbelts,obj,N);
 //     return obj;
@@ -1200,7 +1204,7 @@ EXPORT void tLweExtractLweSample(LweSample* result, const TLweSample* x, const L
 
 
 
-EXPORT void tfhe_blindRotateAndExtract(LweSample *result,
+  void tfhe_blindRotateAndExtract(LweSample *result,
                                        const TorusPolynomial *v,
                                        const TGswSample *bk,
                                        const int32_t barb,
@@ -1230,7 +1234,7 @@ EXPORT void tfhe_blindRotateAndExtract(LweSample *result,
 
 
 
-EXPORT void tfhe_bootstrap_woKS(LweSample *result,
+  void tfhe_bootstrap_woKS(LweSample *result,
                                 const LweBootstrappingKey *bk,
                                 Torus32 mu, const LweSample *x) {
 
@@ -1278,7 +1282,7 @@ void lweKeySwitchTranslate_fromArray(LweSample* result,
     }
 }
 //sample=(a',b')
-EXPORT void lweKeySwitch(LweSample* result, const LweKeySwitchKey* ks, const LweSample* sample){
+  void lweKeySwitch(LweSample* result, const LweKeySwitchKey* ks, const LweSample* sample){
     const LweParams* params=ks->out_params;
     const int32_t n=ks->n;
     const int32_t basebit=ks->basebit;
@@ -1302,7 +1306,7 @@ struct LweSample * new_LweSample( const struct LweParams* params) {
 }
 
 
-EXPORT void tfhe_bootstrap(LweSample *result,
+  void tfhe_bootstrap(LweSample *result,
                            const LweBootstrappingKey *bk,
                            Torus32 mu, const LweSample *x) {
 
@@ -1318,7 +1322,7 @@ EXPORT void tfhe_bootstrap(LweSample *result,
     //delete_LweSample(u);
 }
 
-EXPORT Torus32 modSwitchToTorus32(int32_t mu, int32_t Msize){
+  Torus32 modSwitchToTorus32(int32_t mu, int32_t Msize){
     uint64_t interv = ((UINT64_C(1)<<63)/Msize)*2; // width of each intervall
     uint64_t phase64 = mu*interv;
     //floor to the nearest multiples of interv
@@ -1411,7 +1415,7 @@ void TGswParams_init(struct TGswParams* params,int32_t l, int32_t Bgbit, const s
 }
 
 
-EXPORT void lweKeyGen(LweKey* result) {
+  void lweKeyGen(LweKey* result) {
 
 int32_t alpha = result->params->alpha_min;
     int32_t n = result->params->n;
@@ -1435,7 +1439,7 @@ struct TLweKey * new_tlwe_key(const struct TLweParams *params) {
 
 
 // TLwe
-EXPORT void tLweKeyGen(TLweKey *result) {
+  void tLweKeyGen(TLweKey *result) {
      int32_t N = result->params->N;
      int32_t k = result->params->k;
     //uniform_int_distribution<int32_t> distribution(0, 1);
@@ -1447,7 +1451,7 @@ EXPORT void tLweKeyGen(TLweKey *result) {
 }
 
 
-EXPORT void tGswKeyGen(TGswKey *result) {
+  void tGswKeyGen(TGswKey *result) {
     tLweKeyGen(&result->tlwe_key);
 }
 
@@ -1563,10 +1567,10 @@ void init_LweKeySwitchKey(struct LweKeySwitchKey *obj, int32_t n, int32_t t, int
 	for (int32_t p = 0; p < n; ++p)
 	    obj->ks[p] = obj->ks1_raw + t*p;
 }
-EXPORT LweKeySwitchKey* alloc_LweKeySwitchKey() {
+  LweKeySwitchKey* alloc_LweKeySwitchKey() {
     return (LweKeySwitchKey*) malloc(sizeof(LweKeySwitchKey));
 }
-EXPORT LweKeySwitchKey* new_LweKeySwitchKey(int32_t n, int32_t t, int32_t basebit, const LweParams* out_params) {
+  LweKeySwitchKey* new_LweKeySwitchKey(int32_t n, int32_t t, int32_t basebit, const LweParams* out_params) {
     LweKeySwitchKey* obj = alloc_LweKeySwitchKey();
     // printf("success malloc lwekey\n");
     init_LweKeySwitchKey(obj, n,t,basebit,out_params);
@@ -1578,7 +1582,7 @@ EXPORT LweKeySwitchKey* new_LweKeySwitchKey(int32_t n, int32_t t, int32_t basebi
 }
 
 
-EXPORT void init_LweBootstrappingKey(LweBootstrappingKey *obj, int32_t ks_t, int32_t ks_basebit, const LweParams *in_out_params,
+  void init_LweBootstrappingKey(LweBootstrappingKey *obj, int32_t ks_t, int32_t ks_basebit, const LweParams *in_out_params,
                                      const TGswParams *bk_params) {
      TLweParams *accum_params = bk_params->tlwe_params;
      LweParams *extract_params = &accum_params->extracted_lweparams;
@@ -1599,11 +1603,11 @@ EXPORT void init_LweBootstrappingKey(LweBootstrappingKey *obj, int32_t ks_t, int
     obj->ks = ks;
 }
 
-EXPORT LweBootstrappingKey *alloc_LweBootstrappingKey() {
+  LweBootstrappingKey *alloc_LweBootstrappingKey() {
     return (LweBootstrappingKey *) malloc(sizeof(LweBootstrappingKey));
 }
 
-EXPORT LweBootstrappingKey *
+  LweBootstrappingKey *
 new_LweBootstrappingKey(const int32_t ks_t, const int32_t ks_basebit, const LweParams *in_out_params,
                         const TGswParams *bk_params) {
     LweBootstrappingKey *obj = alloc_LweBootstrappingKey();
@@ -1619,7 +1623,7 @@ new_LweBootstrappingKey(const int32_t ks_t, const int32_t ks_basebit, const LweP
     return obj;
 }
 
-EXPORT void tLweExtractKey(LweKey* result, const TLweKey* key) //sans doute un param supplémentaire
+  void tLweExtractKey(LweKey* result, const TLweKey* key) //sans doute un param supplémentaire
 {
     const int32_t N = key->params->N;
     const int32_t k = key->params->k;
@@ -1631,7 +1635,7 @@ EXPORT void tLweExtractKey(LweKey* result, const TLweKey* key) //sans doute un p
 }
 
 
-// EXPORT void lweNoiselessTrivial(LweSample* result, Torus32 mu, const LweParams* params){
+//   void lweNoiselessTrivial(LweSample* result, Torus32 mu, const LweParams* params){
 //     const int32_t n = params->n;
 
 //     for (int32_t i = 0; i < n; ++i) result->a[i] = 0;
@@ -1640,10 +1644,10 @@ EXPORT void tLweExtractKey(LweKey* result, const TLweKey* key) //sans doute un p
 // }
 
 typedef int int32_t;
-EXPORT Torus32 dtot32(double d) {
+  Torus32 dtot32(double d) {
     return (Torus32)(int64_t)((d - (double)(int64_t)d) * (double)_two32);
     }
-EXPORT void lweSymEncryptWithExternalNoise(LweSample* result, Torus32 message, double noise, double alpha, const LweKey* key){
+  void lweSymEncryptWithExternalNoise(LweSample* result, Torus32 message, double noise, double alpha, const LweKey* key){
     const int32_t n = key->params->n;
 
     result->b = message + dtot32(noise); 
@@ -1658,7 +1662,7 @@ EXPORT void lweSymEncryptWithExternalNoise(LweSample* result, Torus32 message, d
 }
 
 
-EXPORT void lweCreateKeySwitchKey(LweKeySwitchKey* result, const LweKey* in_key, const LweKey* out_key){
+  void lweCreateKeySwitchKey(LweKeySwitchKey* result, const LweKey* in_key, const LweKey* out_key){
     const int32_t n = result->n;
     const int32_t t = result->t;
     const int32_t basebit = result->basebit;
@@ -1712,7 +1716,7 @@ EXPORT void lweCreateKeySwitchKey(LweKeySwitchKey* result, const LweKey* in_key,
     //delete[] noise; 
 }
 
-EXPORT void torusPolynomialUniform(TorusPolynomial *result) {
+  void torusPolynomialUniform(TorusPolynomial *result) {
     const int32_t N = result->N;
     Torus32 *x = result->coefsT;
 
@@ -1723,7 +1727,7 @@ EXPORT void torusPolynomialUniform(TorusPolynomial *result) {
 
 
 
-// EXPORT void torusPolynomialAddMulRFFT(TorusPolynomial* result, const IntPolynomial* poly1, const TorusPolynomial* poly2) {
+//   void torusPolynomialAddMulRFFT(TorusPolynomial* result, const IntPolynomial* poly1, const TorusPolynomial* poly2) {
 //     const int32_t N = poly1->N;
 //     LagrangeHalfCPolynomial* tmp = new_LagrangeHalfCPolynomial_array(3,N);
 //     TorusPolynomial* tmpr = new_TorusPolynomial(N);
@@ -1736,7 +1740,7 @@ EXPORT void torusPolynomialUniform(TorusPolynomial *result) {
 //     delete_LagrangeHalfCPolynomial_array(3,tmp);
 // }
 
-EXPORT void tLweSymEncryptZero(TLweSample *result, double alpha, const TLweKey *key) {
+  void tLweSymEncryptZero(TLweSample *result, double alpha, const TLweKey *key) {
     // if(key->params == NULL)
     //     printf("key->params is NULL\n");
     //     else
@@ -1769,7 +1773,7 @@ EXPORT void tLweSymEncryptZero(TLweSample *result, double alpha, const TLweKey *
     result->current_variance = alpha * alpha;
 }
 
-EXPORT void tGswEncryptZero(TGswSample *result, double alpha, const TGswKey *key) {
+  void tGswEncryptZero(TGswSample *result, double alpha, const TGswKey *key) {
     const TLweKey *rlkey = &key->tlwe_key;
     const int32_t kpl = key->params->kpl;
 
@@ -1778,7 +1782,7 @@ EXPORT void tGswEncryptZero(TGswSample *result, double alpha, const TGswKey *key
     }
 }
 
-EXPORT void tGswAddMuIntH(TGswSample *result, const int32_t message, const TGswParams *params) {
+  void tGswAddMuIntH(TGswSample *result, const int32_t message, const TGswParams *params) {
     const int32_t k = params->tlwe_params->k;
     const int32_t l = params->l;
     const Torus32 *h = params->h;
@@ -1789,12 +1793,12 @@ EXPORT void tGswAddMuIntH(TGswSample *result, const int32_t message, const TGswP
             result->bloc_sample[bloc][i].a[bloc].coefsT[0] += message * h[i];
 }
 
-EXPORT void tGswSymEncryptInt(TGswSample *result, const int32_t message, double alpha, const TGswKey *key) {
+  void tGswSymEncryptInt(TGswSample *result, const int32_t message, double alpha, const TGswKey *key) {
     tGswEncryptZero(result, alpha, key);
     tGswAddMuIntH(result, message, key->params);
 }
 
-EXPORT void tfhe_createLweBootstrappingKey(
+  void tfhe_createLweBootstrappingKey(
         LweBootstrappingKey *bk,
         const LweKey *key_in,
         const TGswKey *rgsw_key) {
@@ -1849,7 +1853,7 @@ EXPORT void tfhe_createLweBootstrappingKey(
 
 // }
 
-EXPORT TFheGateBootstrappingSecretKeySet *
+  TFheGateBootstrappingSecretKeySet *
 new_random_gate_bootstrapping_secret_keyset(const TFheGateBootstrappingParameterSet *params) {
     TFheGateBootstrappingSecretKeySet *obj = (TFheGateBootstrappingSecretKeySet *) malloc(
             sizeof(TFheGateBootstrappingSecretKeySet));
