@@ -104,7 +104,7 @@ void myFree(void* ptr) {
 
 int main() {
     // 为内存池分配一块内存区域
-    char memory[4096];
+    char memory[4096000];
     initMemoryPool(memory, sizeof(memory));
 
     // 创建一个变量
