@@ -5,11 +5,21 @@
 
 #define N_value 1024
 #define n_value 630
+#define MEMORY_SIZE 50*1024
 
 
 #define INT64_C(c) (c ## LL)
 #define UINT64_C(c) (c ## ULL)
 
+typedef int32_t Torus32; //avant uint32_t
+typedef unsigned int		uint32_t;
+typedef unsigned long long uint64_t;
+#define  star_disk_address 0x00000000
+
+
+char memory[MEMORY_SIZE];
+uint32_t used_memory = 0;
+uint64_t rest_memory = MEMORY_SIZE;
 //#include "lagrangehalfc_impl.h"
 /*
 #include "ni.h"
@@ -27,12 +37,21 @@ typedef struct Variable {
     size_t size;
     void* value;
 } Variable;
-
+const char *filename = "sdram.txt";
 
 // 内存池起始地址
 static void* memory_start = NULL;
 // 空闲内存链表
 static Block* free_list = NULL;
+
+
+void initMemoryPool(void* start, size_t size) {
+    memory_start = start;
+    free_list = (Block*)start;
+    free_list->size = size - sizeof(Block);
+    free_list->next = NULL;
+}
+
 
 char* myStrncpy(char* dest, const char* src, size_t n) {
     size_t i;
@@ -44,11 +63,23 @@ char* myStrncpy(char* dest, const char* src, size_t n) {
     }
     return dest;
 }
-void* myMalloc(size_t size) {
+
+
+int malloc_ram_size =0;
+void* mymalloc(size_t size) {
     if (size == 0) {
         return NULL;
     }
-
+    used_memory += size ;
+    used_memory += sizeof(struct Block);
+    // printf("the size of block is %d\n",sizeof(struct Block));
+    printf("the used memory is %d\n",used_memory);
+    // rest_memory -= (size +sizeof(Block));
+    // printf("the rest memory is %d",rest_memory);
+    // printf("    the rest of memory is %ld  ~~  and ~~  ",rest_memory);
+    printf("    malloc size is %d  ~~  and ~~  ", size);
+    malloc_ram_size += size;
+    printf("    malloc_ram_size is %d\n", malloc_ram_size);
     Block* prev = NULL;
     Block* current = free_list;
 
@@ -67,7 +98,7 @@ void* myMalloc(size_t size) {
             } else {
                 prev->next = current->next;
             }
-            printf("the address of current is %p\n", current);
+            //printf("the address of current is %p\n", current);
             return (char*)current + sizeof(Block);
         }
         
@@ -75,17 +106,38 @@ void* myMalloc(size_t size) {
         current = current->next;
     }
     printf("we haven't enough memory\n");
+    abort();
+
     return NULL; // 没有足够的空闲内存
+}
+
+void myFree(void* ptr) {
+    if (ptr != NULL) {
+        
+        Block* block = (Block*)((char*)ptr - sizeof(Block));
+        rest_memory += (block->size + sizeof(Block));
+        used_memory -= block->size;
+        used_memory -= sizeof(struct Block);
+        printf("used memory is recovered to %d",used_memory);
+        printf("free size is %ld memory and now the rest of memory may be is  %ld\n",block->size,rest_memory);
+        block->next = free_list;
+        free_list = block;
+    }
 }
 
 
 
+
 // #define INT64_C(c)  c ## LL
-typedef int32_t Torus32; //avant uint32_t
-typedef unsigned int		uint32_t;
-typedef unsigned long long uint64_t;
+
 //#include "tfhe_io.h"
 //typedef long long int int64_t;
+uint32_t startAddr = 0x1000;
+uint32_t curr_disk_address = 0x00000000;
+
+
+void write_data_to_disk( void *data, size_t dataSize);
+
 
 #define torusPolynomialMulR torusPolynomialMultFFT
 // #define torusPolynomialAddMulR torusPolynomialAddMulRFFT
@@ -282,7 +334,7 @@ struct TFheGateBootstrappingCloudKeySet {
     //const LweBootstrappingKeyFFT *const bkFFT;
 };
 struct TFheGateBootstrappingCloudKeySet * new_TFheGateBootstrappingCloudKeySet(const struct TFheGateBootstrappingParameterSet *params,struct  LweBootstrappingKey *bk){
-    struct TFheGateBootstrappingCloudKeySet *result = (struct TFheGateBootstrappingCloudKeySet *) malloc(sizeof(struct TFheGateBootstrappingCloudKeySet));
+    struct TFheGateBootstrappingCloudKeySet *result = (struct TFheGateBootstrappingCloudKeySet *)  mymalloc(sizeof(struct TFheGateBootstrappingCloudKeySet));
     result->params = params;
     result->bk = bk;
     return result;
@@ -366,15 +418,18 @@ typedef struct TFheGateBootstrappingCloudKeySet TFheGateBootstrappingCloudKeySet
 typedef struct TFheGateBootstrappingSecretKeySet TFheGateBootstrappingSecretKeySet;
 
 // TorusPolynomial的初始化函数
-void TorusPolynomial_init(TorusPolynomial* poly,  int32_t N) {
-    poly->N = N;
-    poly->coefsT = (Torus32*)malloc(N * sizeof(Torus32));
-}
+// void TorusPolynomial_init(TorusPolynomial* poly,  int32_t N) {
+//     poly->N = N;
+//     poly->coefsT = (Torus32*) mymalloc(N * sizeof(Torus32));
+//     write_data_to_disk(poly->coefsT, sizeof(Torus32)*N);
+//     myFree(poly->coefsT);
+//     // write_data_to_disk(poly, sizeof(TorusPolynomial));
+// }
 
-// TorusPolynomial的清理函数（类似于析构函数）
-void TorusPolynomial_destroy(struct TorusPolynomial* poly) {
-    free(poly->coefsT);
-}
+// // TorusPolynomial的清理函数（类似于析构函数）
+// void TorusPolynomial_destroy(struct TorusPolynomial* poly) {
+//     free(poly->coefsT);
+// }
 
 
 
@@ -435,21 +490,32 @@ int32_t modSwitchFromTorus32(Torus32 phase1, int32_t Msize){
 
 
   TorusPolynomial* new_TorusPolynomial(const int32_t N) {
-    TorusPolynomial* tmp = (TorusPolynomial*) malloc(sizeof(TorusPolynomial));
+    TorusPolynomial* tmp = (TorusPolynomial*)  mymalloc(sizeof(TorusPolynomial));
     tmp->N = N;
-    tmp->coefsT = (Torus32*) malloc(N*sizeof(Torus32));
+    tmp->coefsT = (Torus32*)mymalloc(N*sizeof(Torus32));
     // TorusPolynomial_init(tmp,N);
+    //myFree(tmp);
+    myFree(tmp->coefsT);
     return tmp;
 }
 
   TorusPolynomial* new_TorusPolynomial_array(int32_t nbelts, const int32_t N) {
-    TorusPolynomial* obj = (TorusPolynomial*) malloc(nbelts*sizeof(TorusPolynomial));
+    TorusPolynomial* obj = (TorusPolynomial*)mymalloc(nbelts*sizeof(TorusPolynomial));
        if(obj == NULL) 
-        printf("error !!!!failed malloc a TorusPolynomial array\n "); 
+        printf("error !!!!failed  mymalloc a TorusPolynomial array\n "); 
     for (int32_t i = 0; i < nbelts; i++) {
-        TorusPolynomial_init(&obj[i], N);
+        TorusPolynomial* temp =new_TorusPolynomial(N);
+        //write_data_to_disk(temp, sizeof(TorusPolynomial));
+        obj[i] = *temp;
+        myFree(temp);
+        // write_data_to_disk(&obj[i], sizeof(TorusPolynomial));
+        //myFree(obj);
+        // myFree(obj[i].coefsT);
+        //myFree(obj[i].coefsT);
     }
     // init_TorusPolynomial_array(nbelts,obj,N);
+    // write_data_to_disk( obj, sizeof(TorusPolynomial));
+    // myFree(obj);
     return obj;
 }
 
@@ -460,7 +526,7 @@ int32_t modSwitchFromTorus32(Torus32 phase1, int32_t Msize){
 //     }
 //     }
 //   struct LagrangeHalfCPolynomial* new_LagrangeHalfCPolynomial_array(int32_t nbelts, const int32_t N) {
-//     struct LagrangeHalfCPolynomial* obj =(struct LagrangeHalfCPolynomial*) malloc(nbelts*sizeof(struct LagrangeHalfCPolynomial));
+//     struct LagrangeHalfCPolynomial* obj =(struct LagrangeHalfCPolynomial*)  mymalloc(nbelts*sizeof(struct LagrangeHalfCPolynomial));
 //     init_LagrangeHalfCPolynomial_array(nbelts,obj,N);
 //     return obj;
 // }
@@ -468,16 +534,22 @@ int32_t modSwitchFromTorus32(Torus32 phase1, int32_t Msize){
 
 struct TLweSample *new_TLweSample(const TLweParams* params) {
     const int32_t k = params->k;
-    TLweSample* result = (TLweSample*) malloc(sizeof(TLweSample));
+    TLweSample* result = (TLweSample*)mymalloc(sizeof(TLweSample));
     result->a = new_TorusPolynomial_array(k+1, params->N);
     result->b = result->a + k;
     result->current_variance = 0.;
+    //write_data_to_disk(result, sizeof(TLweSample));
+    //write_data_to_disk(result->a, sizeof(TorusPolynomial)*(k+1));
+    //myFree(result);
+    myFree(result->a);
     return result;
 }
 struct TLweSample *new_TLweSample_array(int32_t nbelts, const struct TLweParams *params) {
-    struct TLweSample *obj = (struct TLweSample *)malloc(nbelts * sizeof(struct TLweSample));
+    struct TLweSample *obj = (struct TLweSample *) mymalloc(nbelts * sizeof(struct TLweSample));
     for (int32_t i = 0; i < nbelts; i++) {
-        obj[i] = *new_TLweSample(params);
+        struct TLweSample* temp = new_TLweSample(params);
+        obj[i] = *temp;
+        myFree(temp);
     }
     return obj;
 }
@@ -485,7 +557,7 @@ struct TLweSample *new_TLweSample_array(int32_t nbelts, const struct TLweParams 
 
 // struct TLweSampleFFT *new_TLweSampleFFT(const TLweParams* params) {
 //     const int32_t k = params->k;
-//     TLweSampleFFT* result = (TLweSampleFFT*) malloc(sizeof(TLweSampleFFT));
+//     TLweSampleFFT* result = (TLweSampleFFT*)  mymalloc(sizeof(TLweSampleFFT));
 //     // result->a = new_TorusPolynomialFFT_array(k+1, params->N);
 //     result->a = new_LagrangeHalfCPolynomial_array(k+1, params->N);
 //     result->b = result->a + k;
@@ -493,7 +565,7 @@ struct TLweSample *new_TLweSample_array(int32_t nbelts, const struct TLweParams 
 //     return result;
 // }
 // struct TLweSampleFFT *new_TLweSampleFFT_array(int32_t nbelts, const struct TLweParams *params) {
-//     struct TLweSampleFFT *obj = (struct TLweSampleFFT *)malloc(nbelts * sizeof(struct TLweSampleFFT));
+//     struct TLweSampleFFT *obj = (struct TLweSampleFFT *) mymalloc(nbelts * sizeof(struct TLweSampleFFT));
 //     for (int32_t i = 0; i < nbelts; i++) {
 //         obj[i] = *new_TLweSampleFFT(params);
 //     }
@@ -601,7 +673,7 @@ struct TLweSample *new_TLweSample_array(int32_t nbelts, const struct TLweParams 
 //     //obj->N = N;
 
 //     // 分配内存并初始化 coefsC 数组
-//     obj->coefsC = (struct cplx*)malloc((N / 2) * sizeof(struct cplx));
+//     obj->coefsC = (struct cplx*) mymalloc((N / 2) * sizeof(struct cplx));
 //     // 这里可以根据需要对 coefsC 数组进行初始化
 //     // ...
 //     // 假设 fp1024_fftw 是一个 FFT_Processor_fftw 结构体的全局变量，
@@ -645,7 +717,7 @@ struct TLweSample *new_TLweSample_array(int32_t nbelts, const struct TLweParams 
 //tGswExternMulToTLwe
 
   IntPolynomial* alloc_IntPolynomial_array(int32_t nbelts) {
-    return (IntPolynomial*) malloc(nbelts*sizeof(IntPolynomial));
+    return (IntPolynomial*)  mymalloc(nbelts*sizeof(IntPolynomial));
 }
 
 // IntPolynomial::IntPolynomial(const int32_t N): N(N)
@@ -662,7 +734,7 @@ struct TLweSample *new_TLweSample_array(int32_t nbelts, const struct TLweParams 
 void init_IntPolynomial_array(int32_t nbelts, struct IntPolynomial* obj, const int32_t N) {
     for (int32_t i = 0; i < nbelts; i++) {
         // 为每个元素分配内存
-        obj[i].coefs = (int32_t*)malloc(N * sizeof(int32_t));
+        obj[i].coefs = (int32_t*) mymalloc(N * sizeof(int32_t));
 
         // 初始化 N
         obj[i].N = N;
@@ -1059,7 +1131,7 @@ tfhe_blindRotate(TLweSample *accum, const TGswSample *bk, const int32_t *bara, c
 }
 
 //   TorusPolynomial* alloc_TorusPolynomial_array(int32_t nbelts) {
-//     return (TorusPolynomial*) malloc(nbelts*sizeof(TorusPolynomial));
+//     return (TorusPolynomial*)  mymalloc(nbelts*sizeof(TorusPolynomial));
 // }
 
 // TorusPolynomial::TorusPolynomial(const int32_t N): N(N)
@@ -1132,7 +1204,7 @@ tfhe_blindRotate(TLweSample *accum, const TGswSample *bk, const int32_t *bara, c
 
     TorusPolynomial *testvect = new_TorusPolynomial(N);
     //int32_t *bara = new int32_t[N];
-    int32_t* bara = (int32_t*)malloc(N * sizeof(int32_t));
+    int32_t* bara = (int32_t*) mymalloc(N * sizeof(int32_t));
     int32_t barb = modSwitchFromTorus32(x->b, Nx2);
     for (int32_t i = 0; i < n; i++) {
         bara[i] = modSwitchFromTorus32(x->a[i], Nx2);
@@ -1182,8 +1254,8 @@ void lweKeySwitchTranslate_fromArray(LweSample* result,
 
 
 struct LweSample * new_LweSample( const struct LweParams* params) {
-    struct LweSample* sample = (struct LweSample*) malloc(sizeof(struct LweSample));
-    sample->a = (Torus32*)malloc(params->n * sizeof(Torus32));
+    struct LweSample* sample = (struct LweSample*)  mymalloc(sizeof(struct LweSample));
+    sample->a = (Torus32*) mymalloc(params->n * sizeof(Torus32));
     // 初始化其他成员
     sample->b = 0;
     sample->current_variance = 0.0;
@@ -1216,21 +1288,21 @@ struct LweSample * new_LweSample( const struct LweParams* params) {
 
 
 // void LweSample_init(struct LweSample* sample, const struct LweParams* params) {
-//     sample->a = (Torus32*)malloc(params->n * sizeof(Torus32));
+//     sample->a = (Torus32*) mymalloc(params->n * sizeof(Torus32));
 //     // 初始化其他成员
 //     sample->b = 0;
 //     sample->current_variance = 0.0;
 // }
 
 void LweSample_init(struct LweSample* sample, const struct LweParams* params) {
-    sample->a = (Torus32*)malloc(params->n * sizeof(Torus32));
+    sample->a = (Torus32*) mymalloc(params->n * sizeof(Torus32));//4*630B
     sample->b = 0;
     sample->current_variance = 0.0;
 }
 
 // 分配一个包含nbelts个LweSample的数组
 struct LweSample* alloc_LweSample_array(int32_t nbelts) {
-    return (struct LweSample*)malloc(nbelts * sizeof(struct LweSample));
+    return (struct LweSample*) mymalloc(nbelts * sizeof(struct LweSample));//16KB
 }
 
 // 初始化LweSample数组
@@ -1242,8 +1314,31 @@ void init_LweSample_array(int32_t nbelts, struct LweSample* obj, const struct Lw
 
 // 创建并初始化LweSample数组
 struct LweSample* new_LweSample_array(int32_t nbelts, const struct LweParams* params) {
-    struct LweSample* obj = alloc_LweSample_array(nbelts);
+// #ifdef SUNFLOWER
+    //printf("hi~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+    struct LweSample* obj = (struct LweSample*) malloc(nbelts * sizeof(struct LweSample));//16KB
     init_LweSample_array(nbelts, obj, params);
+    for(int i=0;i<nbelts;i++){   
+        //here have some bug needed to be fixed
+        struct LweSample* temp_sample = (struct LweSample*)  mymalloc(sizeof(struct LweSample));
+        LweSample_init(temp_sample, params);
+        //myFree(temp_sample->a);
+
+       // write_data_to_disk( temp_sample,sizeof(struct LweSample) );
+        myFree(temp_sample);
+    }
+// #else
+// printf("mmmmmmmmmmmmmmmmmmmmmmmmmmm\n");
+//     struct LweSample* obj = curr_disk_address;
+//     // init_LweSample_array(nbelts, obj, params);
+//         for(int i=0;i<nbelts;i++){   
+//         //here have some bug needed to be fixed
+//         struct LweSample* temp_sample = (struct LweSample*)  mymalloc(sizeof(struct LweSample));
+//         LweSample_init(temp_sample, params);
+//         //write_data_to_disk( temp_sample,sizeof(struct LweSample) );
+//         myFree(temp_sample);
+//     }
+// #endif
     return obj;
 }
 
@@ -1274,7 +1369,7 @@ struct LweSample* new_LweSample_array(int32_t nbelts, const struct LweParams* pa
 // }
 
 void TGswParams_init(struct TGswParams* params,int32_t l, int32_t Bgbit, const struct TLweParams* tlwe_params) {
-    //struct TGswParams* params = (struct TGswParams*)malloc(sizeof(struct TGswParams));
+    //struct TGswParams* params = (struct TGswParams*) mymalloc(sizeof(struct TGswParams));
     params->l = l;
     params->Bgbit = Bgbit;
     params->Bg = 1 << Bgbit;
@@ -1283,7 +1378,7 @@ void TGswParams_init(struct TGswParams* params,int32_t l, int32_t Bgbit, const s
     params->tlwe_params = tlwe_params;
     params->kpl = (tlwe_params->k + 1) * l;
 
-    params->h = (Torus32*)malloc(l * sizeof(Torus32));
+    params->h = (Torus32*) mymalloc(l * sizeof(Torus32));
     for (int32_t i = 0; i < l; ++i) {
         int32_t kk = (32 - (i + 1) * Bgbit);
         params->h[i] = 1 << kk; // 1/(Bg^(i+1)) as a Torus32
@@ -1314,7 +1409,7 @@ int32_t alpha = result->params->alpha_min;
 }
 
 struct TLweKey * new_tlwe_key(const struct TLweParams *params) {
-    struct TLweKey *obj = (struct TLweKey *) malloc(sizeof(struct TLweKey));
+    struct TLweKey *obj = (struct TLweKey *)  mymalloc(sizeof(struct TLweKey));
     obj->params = params;
     // obj->key = new_TorusPolynomial_array(params->k, params->N);
     obj->key = new_IntPolynomial_array(params->k, params->N);
@@ -1345,12 +1440,12 @@ struct TLweKey * new_tlwe_key(const struct TLweParams *params) {
 
 
 struct LweKey* new_LweKey( const struct LweParams* params) {
-    struct LweKey* obj = (struct LweKey*)malloc(sizeof(struct LweKey));
+    struct LweKey* obj = (struct LweKey*) mymalloc(sizeof(struct LweKey));
     //struct LweKey* obj ;
 
-    //int32_t *key = (int32_t*)malloc(params->n * sizeof(int32_t));
+    //int32_t *key = (int32_t*) mymalloc(params->n * sizeof(int32_t));
     obj->params = params;
-    obj->key = (int32_t*)malloc(params->n * sizeof(int32_t));
+    obj->key = (int32_t*) mymalloc(params->n * sizeof(int32_t));
     //struct LweKey obj = {params, key};
     return obj;
 }
@@ -1359,8 +1454,8 @@ struct TGswKey* new_TGswKey( const struct TGswParams* params) {
     // struct TGswKey* obj;
     // obj->params = params;
     // obj->tlwe_params = params->tlwe_params;
-    struct TGswKey* obj = (struct TGswKey*)malloc(sizeof(struct TGswKey));
-    struct IntPolynomial *key = (struct IntPolynomial*)malloc(params->kpl * sizeof(struct IntPolynomial));
+    struct TGswKey* obj = (struct TGswKey*) mymalloc(sizeof(struct TGswKey));
+    struct IntPolynomial *key = (struct IntPolynomial*) mymalloc(params->kpl * sizeof(struct IntPolynomial));
     // struct TGswKey obj = {params, params->tlwe_params, key,params->tlwe_params};
     obj->params = params;
     obj->tlwe_params = params->tlwe_params;
@@ -1371,13 +1466,19 @@ struct TGswKey* new_TGswKey( const struct TGswParams* params) {
     return obj;
 }
 struct TGswSample * new_TGswSample( const struct TGswParams *params) {
-    struct TGswSample * obj = (struct TGswSample *)malloc(sizeof(struct TGswSample));
+    struct TGswSample * obj = (struct TGswSample *) mymalloc(sizeof(struct TGswSample));
     const int32_t k = params->tlwe_params->k;
     const int32_t l = params->l;
     struct TLweSample *all_sample = new_TLweSample_array((k + 1) * l, params->tlwe_params);
     if(all_sample == NULL)
-        printf("err!!!!  failed malloc all_sample~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
-    struct TLweSample **bloc_sample = (struct TLweSample **)malloc((k + 1) * sizeof(struct TLweSample *));
+        printf("err!!!!  failed  mymalloc all_sample~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
+    // for (int i=0;i<k+1;i++){
+    //     struct TLweSample * temp = all_sample + p * l; 
+    // }
+    struct TLweSample **bloc_sample = (struct TLweSample **) mymalloc((k + 1) * sizeof(struct TLweSample *));
+    // printf("the malloc bsaple size is %d",)
+
+    printf("the size of b_sample is %d \n",(k + 1) * sizeof(struct TLweSample *));
     for (int32_t p = 0; p < k + 1; ++p) {
         bloc_sample[p] = all_sample + p * l;
     }
@@ -1387,47 +1488,44 @@ struct TGswSample * new_TGswSample( const struct TGswParams *params) {
     obj->all_sample = all_sample;
     obj->k = params->tlwe_params->k;
     obj->l = params->l;
+    myFree(bloc_sample);
+    // for (int i = 0; i < (k + 1) * l; i++) {
+    //     myFree(&all_sample[i]);
+    // }
+    printf("hiiiiiiiiiiiii");
+    myFree(all_sample);
+    //myFree(obj);
     return obj;
 }
-
-// struct TGswSampleFFT * new_TGswSampleFFT( const struct TGswParams *params) {
-//     struct TGswSampleFFT * obj = (struct TGswSampleFFT *)malloc(sizeof(struct TGswSampleFFT));
-//     const int32_t k = params->tlwe_params->k;
-//     const int32_t l = params->l;
-
-//     struct TLweSampleFFT *all_sample = new_TLweSampleFFT_array((k + 1) * l, params->tlwe_params);
-
-//     struct TLweSampleFFT **bloc_sample = (struct TLweSampleFFT **)malloc((k + 1) * sizeof(struct TLweSampleFFT *));
-//     for (int32_t p = 0; p < k + 1; ++p) {
-//         bloc_sample[p] = all_sample + p * l;
-//     }
-//     // struct TGswSampleFFT * obj = {params, bloc_sample, all_sample};
-//     // obj->params = params;
-//     obj->sample = bloc_sample;
-//     obj->all_samples = all_sample;
-//     obj->k = params->tlwe_params->k;
-//     obj->l = params->l;
-//     return obj;
-// }
 
 
 
 struct TGswSample *new_TGswSample_array(int32_t nbelts, const struct TGswParams *params) {
     // printf("the size of array is %d\n",nbelts);
-    struct TGswSample *obj = (struct TGswSample *)malloc(nbelts * sizeof(struct TGswSample));
+    // #ifndef SUNFLOWER
+    struct TGswSample *obj = (struct TGswSample *) mymalloc(nbelts * sizeof(struct TGswSample));//16KB
+    myFree(obj);
+    obj = (struct TGswSample *) malloc(nbelts * sizeof(struct TGswSample));//16KB
+    // #else
+    // struct TGswSample *obj = (struct TGswSample *) mymalloc(nbelts * sizeof(struct TGswSample));//16KB
+    // #endif
+
     // printf("the size of array is %d\n",nbelts);
     if(obj == NULL)
-        printf("err!!!!  failed malloc tgswSample~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
-        else
-            printf("success malloc tgswSample array\n");
+        printf("err!!!!  failed  mymalloc tgswSample~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
+    else
+        printf("success  mymalloc tgswSample array\n");
     for (int  i = 0; i < nbelts; i++) {
-        // printf("111111");
-        obj[i] = *new_TGswSample(params);
+        printf("    i is %d\n",i);    
+        struct TGswSample * temp = new_TGswSample(params);
+        obj[i] = *temp;
+        //write_data_to_disk(&obj[i],sizeof(struct TGswSample));
+        myFree(temp);
     }
     return obj;
 }
 // struct TGswSampleFFT *new_TGswSampleFFT_array(int32_t nbelts, const struct TGswParams *params) {
-//     struct TGswSampleFFT *obj = (struct TGswSampleFFT *)malloc(nbelts * sizeof(struct TGswSampleFFT));
+//     struct TGswSampleFFT *obj = (struct TGswSampleFFT *) mymalloc(nbelts * sizeof(struct TGswSampleFFT));
 //     for (int32_t i = 0; i < nbelts; i++) {
 //         obj[i] = *new_TGswSampleFFT(params);
 //     }
@@ -1438,26 +1536,29 @@ struct TGswSample *new_TGswSample_array(int32_t nbelts, const struct TGswParams 
 
 void init_LweKeySwitchKey(struct LweKeySwitchKey *obj, int32_t n, int32_t t, int32_t basebit, const struct LweParams *out_params) {
     const int32_t base = 1 << basebit;
+    // struct LweSample *ks0_raw = new_LweSample_array(n * t * base, out_params);
+    //
     struct LweSample *ks0_raw = new_LweSample_array(n * t * base, out_params);
 
+    printf("222222\n");
     obj->n = n;
     obj->t = t;
     obj->basebit = basebit;
     obj->out_params = out_params;
     obj->ks0_raw = ks0_raw;
-    obj->ks1_raw = (struct LweSample **) malloc(n * t * sizeof(struct LweSample *));
-    obj->ks = (LweSample***)malloc(n * sizeof(LweSample**));
+    obj->ks1_raw = (struct LweSample **)  mymalloc(n * t * sizeof(struct LweSample *));//4KB
+    obj->ks = (LweSample***) mymalloc(n * sizeof(LweSample**));//4KB
     for (int32_t p = 0; p < n*t; ++p)
 	    obj->ks1_raw[p] = obj->ks0_raw + base*p;
 	for (int32_t p = 0; p < n; ++p)
 	    obj->ks[p] = obj->ks1_raw + t*p;
 }
   LweKeySwitchKey* alloc_LweKeySwitchKey() {
-    return (LweKeySwitchKey*) malloc(sizeof(LweKeySwitchKey));
+    return (LweKeySwitchKey*)  mymalloc(sizeof(LweKeySwitchKey));
 }
   LweKeySwitchKey* new_LweKeySwitchKey(int32_t n, int32_t t, int32_t basebit, const LweParams* out_params) {
     LweKeySwitchKey* obj = alloc_LweKeySwitchKey();
-    // printf("success malloc lwekey\n");
+    // printf("success  mymalloc lwekey\n");
     init_LweKeySwitchKey(obj, n,t,basebit,out_params);
     // if(obj->out_params == NULL)
     //     // printf("out_params is null\n");
@@ -1473,9 +1574,10 @@ void init_LweKeySwitchKey(struct LweKeySwitchKey *obj, int32_t n, int32_t t, int
      LweParams *extract_params = &accum_params->extracted_lweparams;
      int32_t n = in_out_params->n;
      int32_t N = extract_params->n;
-    // printf("the value of n is %d\n",n);
+    // printf("the value of n is %d\n",n);//
+    //here we need to record the sdram address of the bk and ks
     TGswSample *bk = new_TGswSample_array(n, bk_params);
-    // printf("111");
+    printf("111");
     LweKeySwitchKey *ks = new_LweKeySwitchKey(N, ks_t, ks_basebit, in_out_params);
     // printf("222");
     //LweBootstrappingKey *obj = {in_out_params, bk_params, accum_params, extract_params, bk, ks};
@@ -1489,7 +1591,7 @@ void init_LweKeySwitchKey(struct LweKeySwitchKey *obj, int32_t n, int32_t t, int
 }
 
   LweBootstrappingKey *alloc_LweBootstrappingKey() {
-    return (LweBootstrappingKey *) malloc(sizeof(LweBootstrappingKey));
+    return (LweBootstrappingKey *)  mymalloc(sizeof(LweBootstrappingKey));
 }
 
   LweBootstrappingKey *
@@ -1558,7 +1660,7 @@ typedef int int32_t;
     // printf("2.1\n");
     double err = 0;
     // chose a random vector of gaussian noises
-    double* noise = (double*)malloc(sizeof(double) * sizeks);
+    double* noise = (double*) mymalloc(sizeof(double) * sizeks);
     for (int32_t i = 0; i < sizeks; ++i){
         //normal_distribution<double> distribution(0.,alpha); 
         noise[i] = (double)i / (double)sizeks;
@@ -1697,7 +1799,7 @@ typedef int int32_t;
 
     //LweKeySwitchKey* ks; ///< the keyswitch key (s'->s)
     const TLweKey *accum_key = &rgsw_key->tlwe_key;
-    LweKey *extracted_key = new_LweKey(extract_params);
+    LweKey *extracted_key = new_LweKey(extract_params);//4KB
     // printf("1\n");
     tLweExtractKey(extracted_key, accum_key);
     // printf("2\n");
@@ -1724,7 +1826,7 @@ typedef int int32_t;
 
 }
 // LweBootstrappingKeyFFT* new_LweBootstrappingKeyFFT(const struct TFheGateBootstrappingParameterSet *params){
-//     LweBootstrappingKeyFFT* ptr = (LweBootstrappingKeyFFT*) malloc(sizeof(LweBootstrappingKeyFFT));
+//     LweBootstrappingKeyFFT* ptr = (LweBootstrappingKeyFFT*)  mymalloc(sizeof(LweBootstrappingKeyFFT));
 //     ptr->accum_params = params->tgsw_params->tlwe_params;
 //     ptr->extract_params = &params->tgsw_params->tlwe_params->extracted_lweparams;
 //     ptr->bk_params = params->tgsw_params;
@@ -1740,20 +1842,29 @@ typedef int int32_t;
 
   TFheGateBootstrappingSecretKeySet *
 new_random_gate_bootstrapping_secret_keyset(const TFheGateBootstrappingParameterSet *params) {
-    TFheGateBootstrappingSecretKeySet *obj = (TFheGateBootstrappingSecretKeySet *) malloc(
+    TFheGateBootstrappingSecretKeySet *obj = (TFheGateBootstrappingSecretKeySet *)  mymalloc(
             sizeof(TFheGateBootstrappingSecretKeySet));
 
-    LweKey *lwe_key = new_LweKey(params->in_out_params);
-    lweKeyGen(lwe_key);
-    TGswKey *tgsw_key = new_TGswKey(params->tgsw_params);
-    tGswKeyGen(tgsw_key);
     // printf("the value of params->in_out_params->n is : %d\n",params->in_out_params->n);
+    printf("generate the new_LweBootstrappingKey");
     LweBootstrappingKey *bk = new_LweBootstrappingKey(params->ks_t, params->ks_basebit, params->in_out_params,
                                                       params->tgsw_params);
+    printf("finish the new_LweBootstrappingKey");
     // if(bk == NULL)
+
     //     printf("bk is null\n");
-    //     else printf("malloc the bootstrap key successfully\n");
+    //     else printf(" mymalloc the bootstrap key successfully\n");
+    LweKey *lwe_key = new_LweKey(params->in_out_params);
+    lweKeyGen(lwe_key);
+    printf("the address of lwe_key is : %p\n",lwe_key);
+
+    TGswKey *tgsw_key = new_TGswKey(params->tgsw_params);
+    printf("the address of tgsw_key is : %p\n",tgsw_key);
+    tGswKeyGen(tgsw_key);
     tfhe_createLweBootstrappingKey(bk, lwe_key, tgsw_key);
+    myFree(lwe_key);
+    myFree(tgsw_key);
+
     printf("init the bk successfully\n");
     // LweBootstrappingKeyFFT *bkFFT  = new_LweBootstrappingKeyFFT(params);
     // = new_LweBootstrappingKeyFFT(bk);
@@ -1783,14 +1894,14 @@ void init_parms(struct TFheGateBootstrappingParameterSet * params){
     static const double bk_stdev = 1.0 / (1 << 25);; //standard deviation
     static const double max_stdev = 0.012467; //max standard deviation for a 1/4 msg space
     //LweParams params_in_temp = {n, ks_stdev, max_stdev};
-    LweParams *params_in = (LweParams *)malloc(sizeof(LweParams));
+    LweParams *params_in = (LweParams *) mymalloc(sizeof(LweParams));
     params_in->n = n;
     params_in->alpha_min = ks_stdev;
     params_in->alpha_max = max_stdev;
     //LweParams extracted_lweparams = {N * k, bk_stdev, max_stdev};
     // TLweParams params_accum_temp = {N, k, bk_stdev, max_stdev,extracted_lweparams};
     // TLweParams *params_accum = &params_accum_temp;
-    TLweParams *params_accum = (TLweParams *)malloc(sizeof(TLweParams));
+    TLweParams *params_accum = (TLweParams *) mymalloc(sizeof(TLweParams));
     params_accum->N = N;
     params_accum->k = k;
     params_accum->alpha_min = bk_stdev;
@@ -1800,7 +1911,7 @@ void init_parms(struct TFheGateBootstrappingParameterSet * params){
     params_accum->extracted_lweparams.n = N*k;
 
     //TGswParams params_bk_temp = {bk_l, bk_Bgbit, params_accum};
-    TGswParams *params_bk = (TGswParams *)malloc(sizeof(TGswParams));
+    TGswParams *params_bk = (TGswParams *) mymalloc(sizeof(TGswParams));
     TGswParams_init(params_bk,bk_l, bk_Bgbit, params_accum);
     // printf("the params_bk->tlwe_params->k is : %d\n",params_bk->tlwe_params->k);
     //TFheGateBootstrappingParameterSet params_temp = {ks_length, ks_basebit, params_in, params_bk};
@@ -1810,6 +1921,36 @@ void init_parms(struct TFheGateBootstrappingParameterSet * params){
     params->ks_basebit = ks_basebit;
 }
 
+struct Record {
+    uint32_t address;
+    uint32_t dataSize;
+    char data[];
+};
+
+
+
+//use this function to simulate the operation transfer data from dataram to sdram
+void write_data_to_disk(void *data, size_t dataSize) {
+    // extern uint32_t curr_disk_address;
+    printf("the address of curr_disk_address is : %p\n",curr_disk_address);
+    FILE *file = fopen(filename, "ab");
+
+    if (file == NULL) {
+        printf("Error opening file.\n");
+        return;
+    }
+
+   // fwrite(&address, sizeof(uint32_t), 1, file);
+    //fwrite(&dataSize, sizeof(size_t), 1, file);
+    fwrite(&curr_disk_address, sizeof(uint32_t), 1, file);
+    
+    fwrite(data, dataSize, 1, file);
+
+    char newline = '\n';
+    fwrite(&newline, sizeof(char), 1, file);
+    curr_disk_address += dataSize;
+    fclose(file);
+}
 int main()
 {   //we need note the  current ptr
     //struct TFheGateBootstrappingParameterSet *params;
@@ -1817,8 +1958,19 @@ int main()
     // FILE * prams_file = fopen("size_prams","wb");
     //params = new_tfheGateBootstrappingParameterSet_fromFile(prams_file);
     // int std_params = 1;
-    TFheGateBootstrappingParameterSet *params = (TFheGateBootstrappingParameterSet *)malloc(sizeof(TFheGateBootstrappingParameterSet));
+    // char memory[MEMORY_SIZE];
+    printf("the start of memory is : %p   ,and the end of memory is :%p  \n",memory,memory + sizeof(memory));
+
+    // char sdram[4*1024*1024];
+
+
+    initMemoryPool(memory, sizeof(memory));
+
+    TFheGateBootstrappingParameterSet *params = (TFheGateBootstrappingParameterSet *) mymalloc(sizeof(TFheGateBootstrappingParameterSet));
     init_parms(params);
+    write_data_to_disk(params, sizeof(TFheGateBootstrappingParameterSet));
+    //printf("the size of params is : %d\n",sizeof(TFheGateBootstrappingParameterSet));
+    //printf("the address of params is :%x\n",params);
     int N = params->tgsw_params->tlwe_params->N;
     int n = params->in_out_params->n;
     printf("the N is : %d , and the n is : %d\n ",N,n);
