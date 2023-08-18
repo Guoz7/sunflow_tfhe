@@ -45,12 +45,37 @@ static void* memory_start = NULL;
 static Block* free_list = NULL;
 
 
+char sdram[512*1024*1024];
+static void * curr_disk_address = sdram;
+static void * sd_start = NULL;
+static Block* sd_free_list = NULL;
+
+
 void initMemoryPool(void* start, size_t size) {
     memory_start = start;
     free_list = (Block*)start;
     free_list->size = size - sizeof(Block);
     free_list->next = NULL;
 }
+
+
+
+
+
+void init_sdram(void* start, size_t size) {
+    sd_start = start;
+    sd_free_list = (Block*)start;
+    sd_free_list->size = size - sizeof(Block);
+    sd_free_list->next = NULL;
+}
+
+
+// void initMemoryPool_512MB(void* start, size_t size) {
+//     memory_start = start;
+//     free_list = (Block*)start;
+//     free_list->size = size - sizeof(Block);
+//     free_list->next = NULL;
+// }
 
 
 char* myStrncpy(char* dest, const char* src, size_t n) {
@@ -72,7 +97,7 @@ void* mymalloc(size_t size) {
     }
     used_memory += size ;
     used_memory += sizeof(struct Block);
-    // printf("the size of block is %d\n",sizeof(struct Block));
+    // printf("the size of block is %d\n",sizeof(struct Block));/////// size of block is 16B
     printf("the used memory is %d\n",used_memory);
     // rest_memory -= (size +sizeof(Block));
     // printf("the rest memory is %d",rest_memory);
@@ -111,6 +136,26 @@ void* mymalloc(size_t size) {
     return NULL; // 没有足够的空闲内存
 }
 
+
+
+void mergeFreeBlocks() {
+    Block* prev = NULL;
+    Block* current = free_list;
+    
+    while (current != NULL && current->next != NULL) {
+        Block* nextBlock = current->next;
+        
+        if ((char*)current + current->size + sizeof(Block) == (char*)nextBlock) {
+            current->size += nextBlock->size + sizeof(Block);
+            current->next = nextBlock->next;
+        } else {
+            prev = current;
+        }
+        
+        current = current->next;
+    }
+}
+
 void myFree(void* ptr) {
     if (ptr != NULL) {
         
@@ -122,6 +167,7 @@ void myFree(void* ptr) {
         printf("free size is %ld memory and now the rest of memory may be is  %ld\n",block->size,rest_memory);
         block->next = free_list;
         free_list = block;
+        mergeFreeBlocks();
     }
 }
 
@@ -133,10 +179,10 @@ void myFree(void* ptr) {
 //#include "tfhe_io.h"
 //typedef long long int int64_t;
 uint32_t startAddr = 0x1000;
-uint32_t curr_disk_address = 0x00000000;
 
 
-void write_data_to_disk( void *data, size_t dataSize);
+
+void * write_data_to_disk( void *data, size_t dataSize,uint32_t initialed_value);
 
 
 #define torusPolynomialMulR torusPolynomialMultFFT
@@ -488,33 +534,45 @@ int32_t modSwitchFromTorus32(Torus32 phase1, int32_t Msize){
     return phase64/interv;
 }
 
-
+// return the disk address of the TorusPolynomial
   TorusPolynomial* new_TorusPolynomial(const int32_t N) {
     TorusPolynomial* tmp = (TorusPolynomial*)  mymalloc(sizeof(TorusPolynomial));
+
+
+    //tmp = (TorusPolynomial*)malloc(sizeof(TorusPolynomial));
+    //tmp = (TorusPolynomial*)write_data_to_disk(tmp_ram, sizeof(TorusPolynomial),1);
+
     tmp->N = N;
-    tmp->coefsT = (Torus32*)mymalloc(N*sizeof(Torus32));
-    // TorusPolynomial_init(tmp,N);
-    //myFree(tmp);
-    myFree(tmp->coefsT);
+    //tmp->coefsT = (Torus32*)mymalloc(N*sizeof(Torus32));
+    tmp->coefsT = write_data_to_disk(tmp->coefsT, sizeof(Torus32)*N,0);
+    //myFree(tmp->coefsT);
+    myFree(tmp);
+    tmp = write_data_to_disk(tmp, sizeof(TorusPolynomial),1);
+    // tmp->coefsT = (Torus32*)malloc(N*sizeof(Torus32));
     return tmp;
 }
 
   TorusPolynomial* new_TorusPolynomial_array(int32_t nbelts, const int32_t N) {
     TorusPolynomial* obj = (TorusPolynomial*)mymalloc(nbelts*sizeof(TorusPolynomial));
-       if(obj == NULL) 
-        printf("error !!!!failed  mymalloc a TorusPolynomial array\n "); 
+    myFree(obj);
+    //    if(obj == NULL) 
+    //     printf("error !!!!failed  mymalloc a TorusPolynomial array\n "); 
+    //obj = (TorusPolynomial*)malloc(nbelts*sizeof(TorusPolynomial));
+    //obj = (TorusPolynomial*)write_data_to_disk(obj, sizeof(TorusPolynomial)*nbelts,0);
+
     for (int32_t i = 0; i < nbelts; i++) {
         TorusPolynomial* temp =new_TorusPolynomial(N);
         //write_data_to_disk(temp, sizeof(TorusPolynomial));
         obj[i] = *temp;
-        myFree(temp);
-        // write_data_to_disk(&obj[i], sizeof(TorusPolynomial));
+        //myFree(temp);
+        //obj[i] = (TorusPolynomial*)write_data_to_disk(&obj[i], sizeof(TorusPolynomial),1);
         //myFree(obj);
         // myFree(obj[i].coefsT);
         //myFree(obj[i].coefsT);
     }
     // init_TorusPolynomial_array(nbelts,obj,N);
     // write_data_to_disk( obj, sizeof(TorusPolynomial));
+    obj = (TorusPolynomial*)write_data_to_disk(obj, sizeof(TorusPolynomial)*nbelts,1);
     // myFree(obj);
     return obj;
 }
@@ -538,10 +596,9 @@ struct TLweSample *new_TLweSample(const TLweParams* params) {
     result->a = new_TorusPolynomial_array(k+1, params->N);
     result->b = result->a + k;
     result->current_variance = 0.;
-    //write_data_to_disk(result, sizeof(TLweSample));
-    //write_data_to_disk(result->a, sizeof(TorusPolynomial)*(k+1));
-    //myFree(result);
-    myFree(result->a);
+    myFree(result);
+
+    result = (TLweSample*)write_data_to_disk(result, sizeof(TLweSample),1);
     return result;
 }
 struct TLweSample *new_TLweSample_array(int32_t nbelts, const struct TLweParams *params) {
@@ -549,8 +606,11 @@ struct TLweSample *new_TLweSample_array(int32_t nbelts, const struct TLweParams 
     for (int32_t i = 0; i < nbelts; i++) {
         struct TLweSample* temp = new_TLweSample(params);
         obj[i] = *temp;
-        myFree(temp);
+        //myFree(temp);
     }
+    myFree(obj);
+    obj = (struct TLweSample *)write_data_to_disk(obj, sizeof(struct TLweSample)*nbelts,1);
+
     return obj;
 }
 
@@ -748,7 +808,8 @@ void init_IntPolynomial_array(int32_t nbelts, struct IntPolynomial* obj, const i
 }
 
   IntPolynomial* new_IntPolynomial_array(int32_t nbelts, const int32_t N) {
-    IntPolynomial* obj = alloc_IntPolynomial_array(nbelts);
+    IntPolynomial* obj = (IntPolynomial*)  mymalloc(nbelts*sizeof(IntPolynomial));
+
     init_IntPolynomial_array(nbelts,obj,N);
     return obj;
 }
@@ -1296,6 +1357,8 @@ struct LweSample * new_LweSample( const struct LweParams* params) {
 
 void LweSample_init(struct LweSample* sample, const struct LweParams* params) {
     sample->a = (Torus32*) mymalloc(params->n * sizeof(Torus32));//4*630B
+    myFree(sample->a);
+    sample->a = (struct Torus32*) write_data_to_disk( sample->a,params->n * sizeof(Torus32) ,0);
     sample->b = 0;
     sample->current_variance = 0.0;
 }
@@ -1446,6 +1509,10 @@ struct LweKey* new_LweKey( const struct LweParams* params) {
     //int32_t *key = (int32_t*) mymalloc(params->n * sizeof(int32_t));
     obj->params = params;
     obj->key = (int32_t*) mymalloc(params->n * sizeof(int32_t));
+    myFree(obj->key);
+    obj->key = (int32_t*) write_data_to_disk(obj->key,params->n * sizeof(int32_t),0);
+
+    obj = (struct LweKey*) write_data_to_disk(obj,sizeof(struct LweKey),1);
     //struct LweKey obj = {params, key};
     return obj;
 }
@@ -1476,6 +1543,19 @@ struct TGswSample * new_TGswSample( const struct TGswParams *params) {
     //     struct TLweSample * temp = all_sample + p * l; 
     // }
     struct TLweSample **bloc_sample = (struct TLweSample **) mymalloc((k + 1) * sizeof(struct TLweSample *));
+    myFree(bloc_sample);
+    bloc_sample =(struct TLweSample *) write_data_to_disk(bloc_sample,(k + 1) *sizeof(struct TLweSample *),0);
+
+    printf("the value of bloc_sample is %x \n",bloc_sample);
+    // Block * block = (Block *)((char *)bloc_sample - sizeof(Block));
+    //block->size = (k + 1) * sizeof(struct TLweSample *);
+    // printf("the value of block is %x \n",block);/
+    // printf("the size of blocsample is %d \n",block->size);
+    // myFree(bloc_sample);
+    // struct TLweSample **bloc_sample = (struct TLweSample **) malloc((k + 1) * sizeof(struct TLweSample *));
+    // bloc_sample = (struct TLweSample **) mymalloc((k + 1) * sizeof(struct TLweSample *));
+
+    printf("the size of bloc_sample is %d \n",sizeof(bloc_sample));
     // printf("the malloc bsaple size is %d",)
 
     printf("the size of b_sample is %d \n",(k + 1) * sizeof(struct TLweSample *));
@@ -1488,12 +1568,15 @@ struct TGswSample * new_TGswSample( const struct TGswParams *params) {
     obj->all_sample = all_sample;
     obj->k = params->tlwe_params->k;
     obj->l = params->l;
-    myFree(bloc_sample);
+    myFree(obj);
+    obj = (struct TGswSample *) write_data_to_disk(obj,sizeof(struct TGswSample),1);
+
+    //myFree(bloc_sample);
     // for (int i = 0; i < (k + 1) * l; i++) {
     //     myFree(&all_sample[i]);
     // }
     printf("hiiiiiiiiiiiii");
-    myFree(all_sample);
+    //myFree(all_sample);
     //myFree(obj);
     return obj;
 }
@@ -1505,7 +1588,9 @@ struct TGswSample *new_TGswSample_array(int32_t nbelts, const struct TGswParams 
     // #ifndef SUNFLOWER
     struct TGswSample *obj = (struct TGswSample *) mymalloc(nbelts * sizeof(struct TGswSample));//16KB
     myFree(obj);
-    obj = (struct TGswSample *) malloc(nbelts * sizeof(struct TGswSample));//16KB
+    obj = (struct TGswSample *) write_data_to_disk(obj,nbelts * sizeof(struct TGswSample),0);
+    // obj = (struct TGswSample *) malloc(nbelts * sizeof(struct TGswSample));//16KB
+    
     // #else
     // struct TGswSample *obj = (struct TGswSample *) mymalloc(nbelts * sizeof(struct TGswSample));//16KB
     // #endif
@@ -1518,10 +1603,12 @@ struct TGswSample *new_TGswSample_array(int32_t nbelts, const struct TGswParams 
     for (int  i = 0; i < nbelts; i++) {
         printf("    i is %d\n",i);    
         struct TGswSample * temp = new_TGswSample(params);
+        //myFree(temp);
         obj[i] = *temp;
         //write_data_to_disk(&obj[i],sizeof(struct TGswSample));
-        myFree(temp);
     }
+    //myFree(obj);
+    //obj = (struct TGswSample *) write_data_to_disk(obj,nbelts * sizeof(struct TGswSample),1);
     return obj;
 }
 // struct TGswSampleFFT *new_TGswSampleFFT_array(int32_t nbelts, const struct TGswParams *params) {
@@ -1538,28 +1625,46 @@ void init_LweKeySwitchKey(struct LweKeySwitchKey *obj, int32_t n, int32_t t, int
     const int32_t base = 1 << basebit;
     // struct LweSample *ks0_raw = new_LweSample_array(n * t * base, out_params);
     //
-    struct LweSample *ks0_raw = new_LweSample_array(n * t * base, out_params);
+    //struct LweSample *ks0_raw = (struct LweSample *) mymalloc(n * t * base * sizeof(struct LweSample));// here we must replace it with real address
+    //myFree(ks0_raw);
+    struct LweSample* ks0_raw = (struct LweSample *) write_data_to_disk(ks0_raw,n * t * base * sizeof(struct LweSample),0);
+    // for (int32_t p = 0; p < n * t * base; ++p) {
+    //     struct LweSample * temp = (struct LweSample *)  mymalloc(sizeof(struct LweSample));
+    //     myFree(temp);
+    //     temp = (struct LweSample *) write_data_to_disk(temp,sizeof(struct LweSample),0);
+    //     struct LweSample temp_data = *temp;
+    //     ks0_raw[p] = *temp;
+    //     // struct LweSample * data_sd_addr = write_data_to_disk(&ks0_raw[p],sizeof(struct LweSample),1);
+    //     // ks0_raw[p] = *data_sd_addr;
+    // }
+    // // struct LweSample *ks0_raw = new_LweSample_array(n * t * base, out_params);
 
-    printf("222222\n");
+    printf("2222222222222222222222222222222222222\n");
     obj->n = n;
     obj->t = t;
     obj->basebit = basebit;
     obj->out_params = out_params;
     obj->ks0_raw = ks0_raw;
-    obj->ks1_raw = (struct LweSample **)  mymalloc(n * t * sizeof(struct LweSample *));//4KB
-    obj->ks = (LweSample***) mymalloc(n * sizeof(LweSample**));//4KB
+    //obj->ks1_raw = (struct LweSample **)  malloc(n * t * sizeof(struct LweSample *));//4KB   //we need chere the size
+    obj->ks1_raw = (struct LweSample **)  write_data_to_disk(obj->ks1_raw,n * t * sizeof(struct LweSample *),0);
+    // obj->ks = (LweSample***) malloc(n * sizeof(LweSample**));//4KB
+    obj->ks = (struct LweSample***) write_data_to_disk(obj->ks,n * sizeof(struct LweSample**),0);
     for (int32_t p = 0; p < n*t; ++p)
-	    obj->ks1_raw[p] = obj->ks0_raw + base*p;
+	    obj->ks1_raw[p] = obj->ks0_raw + base*p;  // direct modify the real addr
 	for (int32_t p = 0; p < n; ++p)
 	    obj->ks[p] = obj->ks1_raw + t*p;
 }
   LweKeySwitchKey* alloc_LweKeySwitchKey() {
-    return (LweKeySwitchKey*)  mymalloc(sizeof(LweKeySwitchKey));
+    return (LweKeySwitchKey*)mymalloc(sizeof(LweKeySwitchKey));
 }
   LweKeySwitchKey* new_LweKeySwitchKey(int32_t n, int32_t t, int32_t basebit, const LweParams* out_params) {
     LweKeySwitchKey* obj = alloc_LweKeySwitchKey();
+    myFree(obj);
+    // obj = (LweKeySwitchKey*)  malloc(sizeof(LweKeySwitchKey));
+    obj = (struct LweKeySwitchKey *)write_data_to_disk(obj,sizeof(LweKeySwitchKey),0);
     // printf("success  mymalloc lwekey\n");
     init_LweKeySwitchKey(obj, n,t,basebit,out_params);
+
     // if(obj->out_params == NULL)
     //     // printf("out_params is null\n");
     //     else
@@ -1597,8 +1702,12 @@ void init_LweKeySwitchKey(struct LweKeySwitchKey *obj, int32_t n, int32_t t, int
   LweBootstrappingKey *
 new_LweBootstrappingKey(const int32_t ks_t, const int32_t ks_basebit, const LweParams *in_out_params,
                         const TGswParams *bk_params) {
-    LweBootstrappingKey *obj = alloc_LweBootstrappingKey();
+    LweBootstrappingKey *obj = (LweBootstrappingKey *)  mymalloc(sizeof(LweBootstrappingKey));
+   // myFree(obj);
+    //obj = (LweBootstrappingKey *) write_data_to_disk(obj,sizeof(LweBootstrappingKey),0);
     init_LweBootstrappingKey(obj, ks_t, ks_basebit, in_out_params, bk_params);
+    printf("finish new_LweBootstrappingKey\n");
+    
     // if(obj->accum_params == NULL)
     //     printf("accum_params is null\n");
     //     else
@@ -1659,8 +1768,11 @@ typedef int int32_t;
     //const int32_t n_out = out_key->params->n;
     // printf("2.1\n");
     double err = 0;
-    // chose a random vector of gaussian noises
-    double* noise = (double*) mymalloc(sizeof(double) * sizeks);
+    // chose a random vector of gaussian noises   // note here the malloc space is too huge
+    // double* noise = (double*) malloc(sizeof(double) * sizeks);
+    double * noise = (double *) write_data_to_disk(noise,sizeof(double) * sizeks,0);
+
+
     for (int32_t i = 0; i < sizeks; ++i){
         //normal_distribution<double> distribution(0.,alpha); 
         noise[i] = (double)i / (double)sizeks;
@@ -1791,14 +1903,19 @@ typedef int int32_t;
         const TGswKey *rgsw_key) {
     // assert(bk->bk_params == rgsw_key->params);
     // assert(bk->in_out_params == key_in->params);
-
-    const LweParams *in_out_params = bk->in_out_params;
-    const TGswParams *bk_params = bk->bk_params;
-    const TLweParams *accum_params = bk_params->tlwe_params;
-    const LweParams *extract_params = &accum_params->extracted_lweparams;
+    const LweParams *in_out_params = (const LweParams *)mymalloc(sizeof(LweParams));
+    const TGswParams *bk_params = (const TGswParams *)mymalloc(sizeof(TGswParams));
+    const TLweParams *accum_params = (const TLweParams *)mymalloc(sizeof(TLweParams));
+    const LweParams *extract_params = (const LweParams *)mymalloc(sizeof(LweParams));
+    const TLweKey *accum_key = (const TLweKey *)mymalloc(sizeof(TLweKey));
+    in_out_params = bk->in_out_params;
+    bk_params = bk->bk_params;
+    accum_params = bk_params->tlwe_params;
+    extract_params = &accum_params->extracted_lweparams;
 
     //LweKeySwitchKey* ks; ///< the keyswitch key (s'->s)
-    const TLweKey *accum_key = &rgsw_key->tlwe_key;
+    accum_key = &rgsw_key->tlwe_key;
+
     LweKey *extracted_key = new_LweKey(extract_params);//4KB
     // printf("1\n");
     tLweExtractKey(extracted_key, accum_key);
@@ -1854,6 +1971,7 @@ new_random_gate_bootstrapping_secret_keyset(const TFheGateBootstrappingParameter
 
     //     printf("bk is null\n");
     //     else printf(" mymalloc the bootstrap key successfully\n");
+    printf("the address of params->in_out_params is : %p\n",params->in_out_params);
     LweKey *lwe_key = new_LweKey(params->in_out_params);
     lweKeyGen(lwe_key);
     printf("the address of lwe_key is : %p\n",lwe_key);
@@ -1895,6 +2013,7 @@ void init_parms(struct TFheGateBootstrappingParameterSet * params){
     static const double max_stdev = 0.012467; //max standard deviation for a 1/4 msg space
     //LweParams params_in_temp = {n, ks_stdev, max_stdev};
     LweParams *params_in = (LweParams *) mymalloc(sizeof(LweParams));
+    printf("the address of params_in is : %p\n",params_in);
     params_in->n = n;
     params_in->alpha_min = ks_stdev;
     params_in->alpha_max = max_stdev;
@@ -1919,6 +2038,10 @@ void init_parms(struct TFheGateBootstrappingParameterSet * params){
     params->tgsw_params = params_bk;
     params->ks_t = ks_length;
     params->ks_basebit = ks_basebit;
+    // myyFree(params_accum);
+    // myyFree(params_bk);
+    // myyFree(params_in);
+
 }
 
 struct Record {
@@ -1930,27 +2053,53 @@ struct Record {
 
 
 //use this function to simulate the operation transfer data from dataram to sdram
-void write_data_to_disk(void *data, size_t dataSize) {
+void* write_data_to_disk(void *data, size_t dataSize,uint32_t initialed_value) {
     // extern uint32_t curr_disk_address;
-    printf("the address of curr_disk_address is : %p\n",curr_disk_address);
-    FILE *file = fopen(filename, "ab");
+    if(initialed_value == 1){
+        printf("the address of curr_disk_address is : %p\n",curr_disk_address);
+        FILE *file = fopen(filename, "ab");
+        if (file == NULL) {
+            printf("Error opening file.\n");
+            return;
+        }
+    // fwrite(&address, sizeof(uint32_t), 1, file);
+        //fwrite(&dataSize, sizeof(size_t), 1, file);
+        fwrite(data, dataSize, 1, file);
+        fwrite(&curr_disk_address, sizeof(uint32_t), 1, file);
+        fwrite(&dataSize, sizeof(size_t), 1, file);
+        char newline = '\n';
+        fwrite(&newline, sizeof(char), 1, file);
+        fclose(file);
+    }
+    curr_disk_address += dataSize+sizeof(uint32_t)+sizeof(size_t)+sizeof(char);
+
+    return curr_disk_address;
+}
+
+void* read_data_from_disk(size_t* dataSize) {
+    FILE* file = fopen(filename, "rb");
 
     if (file == NULL) {
         printf("Error opening file.\n");
-        return;
+        return NULL;
     }
 
-   // fwrite(&address, sizeof(uint32_t), 1, file);
-    //fwrite(&dataSize, sizeof(size_t), 1, file);
-    fwrite(&curr_disk_address, sizeof(uint32_t), 1, file);
-    
-    fwrite(data, dataSize, 1, file);
+    fseek(file, curr_disk_address, SEEK_SET);
+    fread(&curr_disk_address, sizeof(uint32_t), 1, file);
 
-    char newline = '\n';
-    fwrite(&newline, sizeof(char), 1, file);
-    curr_disk_address += dataSize;
+    fread(dataSize, sizeof(size_t), 1, file);
+    void* data = malloc(*dataSize);
+
+    fread(data, *dataSize, 1, file);
+
     fclose(file);
+    return data;
 }
+
+
+
+
+
 int main()
 {   //we need note the  current ptr
     //struct TFheGateBootstrappingParameterSet *params;
@@ -1960,21 +2109,24 @@ int main()
     // int std_params = 1;
     // char memory[MEMORY_SIZE];
     printf("the start of memory is : %p   ,and the end of memory is :%p  \n",memory,memory + sizeof(memory));
-
     // char sdram[4*1024*1024];
 
 
     initMemoryPool(memory, sizeof(memory));
-
+    init_sdram(sdram, sizeof(sdram));
     TFheGateBootstrappingParameterSet *params = (TFheGateBootstrappingParameterSet *) mymalloc(sizeof(TFheGateBootstrappingParameterSet));
     init_parms(params);
-    write_data_to_disk(params, sizeof(TFheGateBootstrappingParameterSet));
+    TFheGateBootstrappingParameterSet * params_SD = (struct TFheGateBootstrappingParameterSet *)write_data_to_disk(params, sizeof(TFheGateBootstrappingParameterSet),1);
     //printf("the size of params is : %d\n",sizeof(TFheGateBootstrappingParameterSet));
     //printf("the address of params is :%x\n",params);
     int N = params->tgsw_params->tlwe_params->N;
     int n = params->in_out_params->n;
+    double alpha = params->in_out_params->alpha_min;
+    printf("the test of alpha is : %f\n",alpha);
     printf("the N is : %d , and the n is : %d\n ",N,n);
     printf("the product of N * n = : %d\n",N * n);
+    double test = params->tgsw_params->tlwe_params->alpha_max;
+    printf("the value of test is : %f\n",test);
     //////
     // }
    //printf("hello world\n");
